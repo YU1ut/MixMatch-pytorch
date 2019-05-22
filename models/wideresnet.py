@@ -7,11 +7,11 @@ import torch.nn.functional as F
 class BasicBlock(nn.Module):
     def __init__(self, in_planes, out_planes, stride, dropRate=0.0, activate_before_residual=False):
         super(BasicBlock, self).__init__()
-        self.bn1 = nn.BatchNorm2d(in_planes, momentum=0.999)
+        self.bn1 = nn.BatchNorm2d(in_planes, momentum=0.001)
         self.relu1 = nn.LeakyReLU(negative_slope=0.1, inplace=True)
         self.conv1 = nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
                                padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(out_planes, momentum=0.999)
+        self.bn2 = nn.BatchNorm2d(out_planes, momentum=0.001)
         self.relu2 = nn.LeakyReLU(negative_slope=0.1, inplace=True)
         self.conv2 = nn.Conv2d(out_planes, out_planes, kernel_size=3, stride=1,
                                padding=1, bias=False)
@@ -60,7 +60,7 @@ class WideResNet(nn.Module):
         # 3rd block
         self.block3 = NetworkBlock(n, nChannels[2], nChannels[3], block, 2, dropRate)
         # global average pooling and classifier
-        self.bn1 = nn.BatchNorm2d(nChannels[3], momentum=0.999)
+        self.bn1 = nn.BatchNorm2d(nChannels[3], momentum=0.001)
         self.relu = nn.LeakyReLU(negative_slope=0.1, inplace=True)
         self.fc = nn.Linear(nChannels[3], num_classes)
         self.nChannels = nChannels[3]
