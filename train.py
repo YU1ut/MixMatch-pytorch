@@ -148,7 +148,7 @@ def main():
         val_loss, val_acc = validate(val_loader, ema_model, criterion, epoch, use_cuda, mode='Valid Stats')
         test_loss, test_acc = validate(test_loader, ema_model, criterion, epoch, use_cuda, mode='Test Stats ')
 
-        step += args.batch_size * args.val_iteration * (epoch + 1)
+        step = args.batch_size * args.val_iteration * (epoch + 1)
 
         writer.add_scalar('losses/train_loss', train_loss, step)
         writer.add_scalar('losses/valid_loss', val_loss, step)
