@@ -36,11 +36,13 @@ python train.py --gpu <gpu_id> --n-labeled 4000 --out cifar10@4000
 tensorboard.sh --port 6006 --logdir cifar10@250
 ```
 
-## Results
-Still in progress since this method needs to run with very large iterations.
-But the performance of this implementation seems to be close to the official  implementation (within 1% of accuracy) so far.
+## Results (Accuracy)
+| #Labels | 250 | 500 | 1000 | 2000| 4000 |
+|:---|:---:|:---:|:---:|:---:|:---:|
+|Paper | 88.92 ± 0.87 | 90.35 ± 0.94 | 92.25 ± 0.32| 92.97 ± 0.15 |93.76 ± 0.06|
+|This code | 88.707 | 88.96 | 90.514 | 92.23 | 93.52 |
 
-Results will be updated after all experiments are over.
+(Results of this code were evaluated on 1 run. Results of 5 runs with different seeds will be updated later. )
 
 ## References
 ```
