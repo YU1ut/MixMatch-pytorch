@@ -10,7 +10,7 @@ This repository carefully implemented important details of the official implemen
 ## Requirements
 - Python 3.6+
 - PyTorch 1.0
-- torchvision 0.2.2
+- **torchvision 0.2.2 (older versions are not compatible with this code)** 
 - tensorboardX
 - progress
 - matplotlib
