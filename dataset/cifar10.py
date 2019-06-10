@@ -25,7 +25,7 @@ def get_cifar10(root, n_labeled,
     val_dataset = CIFAR10_labeled(root, val_idxs, train=True, transform=transform_val, download=True)
     test_dataset = CIFAR10_labeled(root, train=False, transform=transform_val, download=True)
 
-    print (f"#Labeled: {len(train_labeled_idxs)} #Unlabeled: {len(train_unlabeled_idxs)} #Val: {len(val_idxs)}")
+    print ("#Labeled: {len(train_labeled_idxs)} #Unlabeled: {len(train_unlabeled_idxs)} #Val: {len(val_idxs)}")
     return train_labeled_dataset, train_unlabeled_dataset, val_dataset, test_dataset
     
 

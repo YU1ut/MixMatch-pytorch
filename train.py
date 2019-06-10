@@ -17,15 +17,17 @@ import torch.utils.data as data
 import torchvision.transforms as transforms
 import torch.nn.functional as F
 
-import models.wideresnet as models
+#import models.wideresnet as models
+from models.Classifier import Classifier
 import dataset.cifar10 as dataset
 from utils import Bar, Logger, AverageMeter, accuracy, mkdir_p, savefig
-from tensorboardX import SummaryWriter
+#from tensorboardX import SummaryWriter
 
 parser = argparse.ArgumentParser(description='PyTorch MixMatch Training')
 # Optimization options
 parser.add_argument('--epochs', default=1024, type=int, metavar='N',
                     help='number of total epochs to run')
+
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
 parser.add_argument('--batch-size', default=64, type=int, metavar='N',
@@ -74,7 +76,7 @@ def main():
         mkdir_p(args.out)
 
     # Data
-    print(f'==> Preparing cifar10')
+    print('==> Preparing cifar10')
     transform_train = transforms.Compose([
         dataset.RandomPadandCrop(32),
         dataset.RandomFlip(),
@@ -95,7 +97,7 @@ def main():
     print("==> creating WRN-28-2")
 
     def create_model(ema=False):
-        model = models.WideResNet(num_classes=10)
+        model = Classifier(num_classes=10)
         model = model.cuda()
 
         if ema:
@@ -135,7 +137,7 @@ def main():
         logger = Logger(os.path.join(args.out, 'log.txt'), title=title)
         logger.set_names(['Train Loss', 'Train Loss X', 'Train Loss U',  'Valid Loss', 'Valid Acc.', 'Test Loss', 'Test Acc.'])
 
-    writer = SummaryWriter(args.out)
+    #writer = SummaryWriter(args.out)
     step = 0
     test_accs = []
     # Train and val
@@ -150,13 +152,13 @@ def main():
 
         step = args.batch_size * args.val_iteration * (epoch + 1)
 
-        writer.add_scalar('losses/train_loss', train_loss, step)
-        writer.add_scalar('losses/valid_loss', val_loss, step)
-        writer.add_scalar('losses/test_loss', test_loss, step)
-
-        writer.add_scalar('accuracy/train_acc', train_acc, step)
-        writer.add_scalar('accuracy/val_acc', val_acc, step)
-        writer.add_scalar('accuracy/test_acc', test_acc, step)
+        # writer.add_scalar('losses/train_loss', train_loss, step)
+        # writer.add_scalar('losses/valid_loss', val_loss, step)
+        # writer.add_scalar('losses/test_loss', test_loss, step)
+        #
+        # writer.add_scalar('accuracy/train_acc', train_acc, step)
+        # writer.add_scalar('accuracy/val_acc', val_acc, step)
+        # writer.add_scalar('accuracy/test_acc', test_acc, step)
         
         # scheduler.step()
 
@@ -176,7 +178,7 @@ def main():
             }, is_best)
         test_accs.append(test_acc)
     logger.close()
-    writer.close()
+    #writer.close()
 
     print('Best acc:')
     print(best_acc)
@@ -318,7 +320,7 @@ def validate(valloader, model, criterion, epoch, use_cuda, mode):
     model.eval()
 
     end = time.time()
-    bar = Bar(f'{mode}', max=len(valloader))
+    bar = Bar('{mode}', max=len(valloader))
     with torch.no_grad():
         for batch_idx, (inputs, targets) in enumerate(valloader):
             # measure data loading time
@@ -384,7 +386,7 @@ class WeightEMA(object):
         self.model = model
         self.ema_model = ema_model
         self.alpha = alpha
-        self.tmp_model = models.WideResNet(num_classes=10).cuda()
+        self.tmp_model = Classifier(num_classes=10).cuda()
         self.wd = 0.02 * args.lr
 
         for param, ema_param in zip(self.model.parameters(), self.ema_model.parameters()):
