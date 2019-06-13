@@ -21,6 +21,7 @@ import torch.nn.functional as F
 from models.Classifier import Classifier
 import dataset.cifar10 as dataset
 from utils import Bar, Logger, AverageMeter, accuracy, mkdir_p, savefig
+from models.wideresnet import WideResNet
 #from tensorboardX import SummaryWriter
 
 parser = argparse.ArgumentParser(description='PyTorch MixMatch Training')
@@ -53,7 +54,7 @@ parser.add_argument('--alpha', default=0.75, type=float)
 parser.add_argument('--lambda-u', default=75, type=float)
 parser.add_argument('--T', default=0.5, type=float)
 parser.add_argument('--ema-decay', default=0.999, type=float)
-
+parser.add_argument('--type', default=0, type=int,help='Choose different backbone: 0:wide-resnet 1:te-module 13 layer')
 
 args = parser.parse_args()
 state = {k: v for k, v in args._get_kwargs()}
@@ -97,7 +98,10 @@ def main():
     print("==> creating WRN-28-2")
 
     def create_model(ema=False):
-        model = Classifier(num_classes=10)
+        if args.type==1:
+            model = Classifier(num_classes=10)
+        else:
+            model=WideResNet(num_classes=10)
         model = model.cuda()
 
         if ema:
@@ -116,7 +120,7 @@ def main():
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
-    ema_optimizer= WeightEMA(model, ema_model, alpha=args.ema_decay)
+    ema_optimizer= WeightEMA(model, ema_model, run_type=args.type,alpha=args.ema_decay)
     start_epoch = 0
 
     # Resume
@@ -209,6 +213,7 @@ def train(labeled_trainloader, unlabeled_trainloader, model, optimizer, ema_opti
         except:
             labeled_train_iter = iter(labeled_trainloader)
             inputs_x, targets_x = labeled_train_iter.next()
+
 
         try:
             (inputs_u, inputs_u2), _ = unlabeled_train_iter.next()
@@ -382,11 +387,14 @@ class SemiLoss(object):
         return Lx, Lu, args.lambda_u * linear_rampup(epoch)
 
 class WeightEMA(object):
-    def __init__(self, model, ema_model, alpha=0.999):
+    def __init__(self, model, ema_model,run_type=0, alpha=0.999):
         self.model = model
         self.ema_model = ema_model
         self.alpha = alpha
-        self.tmp_model = Classifier(num_classes=10).cuda()
+        if run_type==1:
+            self.tmp_model = Classifier(num_classes=10).cuda()
+        else:
+            self.tmp_model =WideResNet(num_classes=10).cuda()
         self.wd = 0.02 * args.lr
 
         for param, ema_param in zip(self.model.parameters(), self.ema_model.parameters()):
