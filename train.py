@@ -22,7 +22,7 @@ from models.Classifier import Classifier
 import dataset.cifar10 as dataset
 from utils import Bar, Logger, AverageMeter, accuracy, mkdir_p, savefig
 from models.wideresnet import WideResNet
-#from tensorboardX import SummaryWriter
+from tensorboardX import SummaryWriter
 
 parser = argparse.ArgumentParser(description='PyTorch MixMatch Training')
 # Optimization options
@@ -141,7 +141,7 @@ def main():
         logger = Logger(os.path.join(args.out, 'log.txt'), title=title)
         logger.set_names(['Train Loss', 'Train Loss X', 'Train Loss U',  'Valid Loss', 'Valid Acc.', 'Test Loss', 'Test Acc.'])
 
-    #writer = SummaryWriter(args.out)
+    writer = SummaryWriter(args.out)
     step = 0
     test_accs = []
     # Train and val
@@ -156,13 +156,13 @@ def main():
 
         step = args.batch_size * args.val_iteration * (epoch + 1)
 
-        # writer.add_scalar('losses/train_loss', train_loss, step)
-        # writer.add_scalar('losses/valid_loss', val_loss, step)
-        # writer.add_scalar('losses/test_loss', test_loss, step)
-        #
-        # writer.add_scalar('accuracy/train_acc', train_acc, step)
-        # writer.add_scalar('accuracy/val_acc', val_acc, step)
-        # writer.add_scalar('accuracy/test_acc', test_acc, step)
+        writer.add_scalar('losses/train_loss', train_loss, step)
+        writer.add_scalar('losses/valid_loss', val_loss, step)
+        writer.add_scalar('losses/test_loss', test_loss, step)
+
+        writer.add_scalar('accuracy/train_acc', train_acc, step)
+        writer.add_scalar('accuracy/val_acc', val_acc, step)
+        writer.add_scalar('accuracy/test_acc', test_acc, step)
         
         # scheduler.step()
 
@@ -182,7 +182,7 @@ def main():
             }, is_best)
         test_accs.append(test_acc)
     logger.close()
-    #writer.close()
+    writer.close()
 
     print('Best acc:')
     print(best_acc)
