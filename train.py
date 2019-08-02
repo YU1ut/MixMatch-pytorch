@@ -363,7 +363,7 @@ def save_checkpoint(state, is_best, checkpoint=args.out, filename='checkpoint.pt
     if is_best:
         shutil.copyfile(filepath, os.path.join(checkpoint, 'model_best.pth.tar'))
 
-def linear_rampup(current, rampup_length=16):
+def linear_rampup(current, rampup_length=args.epochs):
     if rampup_length == 0:
         return 1.0
     else:
