@@ -148,7 +148,7 @@ def main():
         val_loss, val_acc = validate(val_loader, ema_model, criterion, epoch, use_cuda, mode='Valid Stats')
         test_loss, test_acc = validate(test_loader, ema_model, criterion, epoch, use_cuda, mode='Test Stats ')
 
-        step = args.batch_size * args.val_iteration * (epoch + 1)
+        step = args.val_iteration * (epoch + 1)
 
         writer.add_scalar('losses/train_loss', train_loss, step)
         writer.add_scalar('losses/valid_loss', val_loss, step)
@@ -157,8 +157,6 @@ def main():
         writer.add_scalar('accuracy/train_acc', train_acc, step)
         writer.add_scalar('accuracy/val_acc', val_acc, step)
         writer.add_scalar('accuracy/test_acc', test_acc, step)
-        
-        # scheduler.step()
 
         # append logger file
         logger.append([train_loss, train_loss_x, train_loss_u, val_loss, val_acc, test_loss, test_acc])
@@ -302,8 +300,6 @@ def train(labeled_trainloader, unlabeled_trainloader, model, optimizer, ema_opti
         bar.next()
     bar.finish()
 
-    ema_optimizer.step(bn=True)
-
     return (losses.avg, losses_x.avg, losses_u.avg,)
 
 def validate(valloader, model, criterion, epoch, use_cuda, mode):
@@ -384,29 +380,20 @@ class WeightEMA(object):
         self.model = model
         self.ema_model = ema_model
         self.alpha = alpha
-        self.tmp_model = models.WideResNet(num_classes=10).cuda()
+        self.params = list(model.state_dict().values())
+        self.ema_params = list(ema_model.state_dict().values())
         self.wd = 0.02 * args.lr
 
-        for param, ema_param in zip(self.model.parameters(), self.ema_model.parameters()):
-            ema_param.data.copy_(param.data)
+        for param, ema_param in zip(self.params, self.ema_params):
+            param = ema_param
 
-    def step(self, bn=False):
-        if bn:
-            # copy batchnorm stats to ema model
-            for ema_param, tmp_param in zip(self.ema_model.parameters(), self.tmp_model.parameters()):
-                tmp_param.data.copy_(ema_param.data.detach())
-
-            self.ema_model.load_state_dict(self.model.state_dict())
-
-            for ema_param, tmp_param in zip(self.ema_model.parameters(), self.tmp_model.parameters()):
-                ema_param.data.copy_(tmp_param.data.detach())
-        else:
-            one_minus_alpha = 1.0 - self.alpha
-            for param, ema_param in zip(self.model.parameters(), self.ema_model.parameters()):
-                ema_param.data.mul_(self.alpha)
-                ema_param.data.add_(param.data.detach() * one_minus_alpha)
-                # customized weight decay
-                param.data.mul_(1 - self.wd)
+    def step(self):
+        one_minus_alpha = 1.0 - self.alpha
+        for param, ema_param in zip(self.params, self.ema_params):
+            ema_param.mul_(self.alpha)
+            ema_param.add_(param * one_minus_alpha)
+            # customized weight decay
+            param.mul_(1 - self.wd)
 
 def interleave_offsets(batch, nu):
     groups = [batch // (nu + 1)] * (nu + 1)
