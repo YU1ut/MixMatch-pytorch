@@ -197,7 +197,6 @@ def train(labeled_trainloader, unlabeled_trainloader, model, optimizer, ema_opti
     labeled_train_iter = iter(labeled_trainloader)
     unlabeled_train_iter = iter(unlabeled_trainloader)
 
-    
     model.train()
     for batch_idx in range(args.val_iteration):
         try:
@@ -322,7 +321,6 @@ def validate(valloader, model, criterion, epoch, use_cuda, mode):
 
             if use_cuda:
                 inputs, targets = inputs.cuda(), targets.cuda(non_blocking=True)
-            
             # compute output
             outputs = model(inputs)
             loss = criterion(outputs, targets)
@@ -385,7 +383,7 @@ class WeightEMA(object):
         self.wd = 0.02 * args.lr
 
         for param, ema_param in zip(self.params, self.ema_params):
-            param = ema_param
+            param.data.copy_(ema_param.data)
 
     def step(self):
         one_minus_alpha = 1.0 - self.alpha
