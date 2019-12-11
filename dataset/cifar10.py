@@ -4,6 +4,29 @@ from PIL import Image
 import torchvision
 import torch
 
+import torchvision.transforms as transforms
+from torchvision.datasets import STL10
+
+# dict containing supported datasets with their image resolutions
+imsize_dict = {'C10': 32, 'STL10': 96}
+
+cifar10_mean = (0.4914, 0.4822, 0.4465)
+cifar10_std = (0.2023, 0.1994, 0.2010)
+
+stl10_mean = (0.4914, 0.4822, 0.4465)
+stl10_std = (0.2471, 0.2435, 0.2616)
+
+dataset_stats = {
+    'C10' : {
+        'mean': cifar10_mean,
+        'std': cifar10_std
+    },
+    'STL10' : {
+        'mean': stl10_mean,
+        'std': stl10_std
+    },
+}
+
 class TransformTwice:
     def __init__(self, transform):
         self.transform = transform
@@ -27,7 +50,67 @@ def get_cifar10(root, n_labeled,
 
     print (f"#Labeled: {len(train_labeled_idxs)} #Unlabeled: {len(train_unlabeled_idxs)} #Val: {len(val_idxs)}")
     return train_labeled_dataset, train_unlabeled_dataset, val_dataset, test_dataset
-    
+
+def get_stl10(root,
+                 transform_train=None, transform_val=None,
+                 download=True):
+
+    training_set = STL10(root, split='train', download=True, transform=transform_train)
+    dev_set = STL10(root, split='test', download=True, transform=transform_val)
+    unl_set = STL10(root, split='unlabeled', download=True, transform=transform_train)
+
+    print (f"#Labeled: {len(training_set)} #Unlabeled: {len(unl_set)} #Val: {len(dev_set)} #Test: None")
+    return training_set, unl_set, dev_set, None
+
+def validate_dataset(dataset):
+    if dataset not in imsize_dict:
+        raise ValueError("Dataset %s not supported." % dataset)
+
+def get_transforms(dataset, resolution):
+    dataset_resolution = imsize_dict[dataset]
+
+    if dataset == 'STL10':
+        if resolution == 96:
+            transform_train = transforms.Compose([
+                transforms.RandomCrop(96, padding=4),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize(stl10_mean, stl10_std),
+            ])
+        else:
+            transform_train = transforms.Compose([
+                transforms.RandomCrop(86, padding=0),
+                transforms.Resize(resolution),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize(stl10_mean, stl10_std),
+            ])
+        if dataset_resolution == resolution:
+            transform_val = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize(dataset_stats[dataset]['mean'], dataset_stats[dataset]['std']),
+            ])
+        else:
+            transform_val = transforms.Compose([
+                transforms.Resize(resolution),
+                transforms.ToTensor(),
+                transforms.Normalize(dataset_stats[dataset]['mean'], dataset_stats[dataset]['std']),
+            ])
+    if dataset == 'C10':
+        # already normalized in the CIFAR10_labeled/CIFAR10_unlabeled class
+        transform_train = transforms.Compose([
+            RandomPadandCrop(resolution),
+            RandomFlip(),
+            ToTensor(),
+        ])
+        transform_val = transforms.Compose([
+            ToTensor(),
+        ])
+
+
+    return transform_train, transform_val
+
+
 
 def train_val_split(labels, n_labeled_per_class):
     labels = np.array(labels)
@@ -46,9 +129,6 @@ def train_val_split(labels, n_labeled_per_class):
     np.random.shuffle(val_idxs)
 
     return train_labeled_idxs, train_unlabeled_idxs, val_idxs
-
-cifar10_mean = (0.4914, 0.4822, 0.4465) # equals np.mean(train_set.train_data, axis=(0,1,2))/255
-cifar10_std = (0.2471, 0.2435, 0.2616) # equals np.std(train_set.train_data, axis=(0,1,2))/255
 
 def normalise(x, mean=cifar10_mean, std=cifar10_std):
     x, mean, std = [np.array(a, np.float32) for a in (x, mean, std)]

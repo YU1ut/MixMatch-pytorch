@@ -14,7 +14,6 @@ import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torch.optim as optim
 import torch.utils.data as data
-import torchvision.transforms as transforms
 import torch.nn.functional as F
 
 import models.wideresnet as models
@@ -51,7 +50,12 @@ parser.add_argument('--alpha', default=0.75, type=float)
 parser.add_argument('--lambda-u', default=75, type=float)
 parser.add_argument('--T', default=0.5, type=float)
 parser.add_argument('--ema-decay', default=0.999, type=float)
-
+parser.add_argument('--resolution', default=32, type=int)
+# Data options
+parser.add_argument('--data_root', default='data',
+                        help='Data directory')
+parser.add_argument('--dataset', default='C10',
+                        help='Dataset name: C10 | STL10')
 
 args = parser.parse_args()
 state = {k: v for k, v in args._get_kwargs()}
@@ -67,6 +71,13 @@ np.random.seed(args.manualSeed)
 
 best_acc = 0  # best test accuracy
 
+which_model = models.WideResNet
+if args.resolution == 96:
+    which_model = models.WideResNet96
+if args.resolution == 48:
+    which_model = models.WideResNet48
+
+
 def main():
     global best_acc
 
@@ -74,28 +85,31 @@ def main():
         mkdir_p(args.out)
 
     # Data
-    print(f'==> Preparing cifar10')
-    transform_train = transforms.Compose([
-        dataset.RandomPadandCrop(32),
-        dataset.RandomFlip(),
-        dataset.ToTensor(),
-    ])
+    dataset.validate_dataset(args.dataset)
+    print(f'==> Preparing %s' % args.dataset)
+    
+    transform_train, transform_val = dataset.get_transforms(args.dataset, args.resolution)
+    
+    if args.dataset == 'C10':
+        train_labeled_set, train_unlabeled_set, val_set, test_set = dataset.get_cifar10(args.data_root, args.n_labeled, transform_train=transform_train, transform_val=transform_val)
+    elif args.dataset == 'STL10':
+        if args.n_labeled != 5000:
+            raise ValueError("For STL10 the only supported n_labeled is 5000")
+        train_labeled_set, train_unlabeled_set, val_set, test_set = dataset.get_stl10(args.data_root, transform_train=transform_train, transform_val=transform_val)
 
-    transform_val = transforms.Compose([
-        dataset.ToTensor(),
-    ])
-
-    train_labeled_set, train_unlabeled_set, val_set, test_set = dataset.get_cifar10('./data', args.n_labeled, transform_train=transform_train, transform_val=transform_val)
     labeled_trainloader = data.DataLoader(train_labeled_set, batch_size=args.batch_size, shuffle=True, num_workers=0, drop_last=True)
     unlabeled_trainloader = data.DataLoader(train_unlabeled_set, batch_size=args.batch_size, shuffle=True, num_workers=0, drop_last=True)
-    val_loader = data.DataLoader(val_set, batch_size=args.batch_size, shuffle=False, num_workers=0)
-    test_loader = data.DataLoader(test_set, batch_size=args.batch_size, shuffle=False, num_workers=0)
+    val_loader = data.DataLoader(val_set, batch_size=args.batch_size, shuffle=True, num_workers=0, drop_last=True)
+    if test_set is not None:
+        test_loader = data.DataLoader(test_set, batch_size=args.batch_size, shuffle=False, num_workers=0)
+    else:
+        test_loader = None
 
     # Model
-    print("==> creating WRN-28-2")
+    print("==> creating %s" % which_model.__name__)
 
     def create_model(ema=False):
-        model = models.WideResNet(num_classes=10)
+        model = which_model(num_classes=10)
         model = model.cuda()
 
         if ema:
@@ -123,7 +137,6 @@ def main():
         # Load checkpoint.
         print('==> Resuming from checkpoint..')
         assert os.path.isfile(args.resume), 'Error: no checkpoint directory found!'
-        args.out = os.path.dirname(args.resume)
         checkpoint = torch.load(args.resume)
         best_acc = checkpoint['best_acc']
         start_epoch = checkpoint['epoch']
@@ -146,7 +159,10 @@ def main():
         train_loss, train_loss_x, train_loss_u = train(labeled_trainloader, unlabeled_trainloader, model, optimizer, ema_optimizer, train_criterion, epoch, use_cuda)
         _, train_acc = validate(labeled_trainloader, ema_model, criterion, epoch, use_cuda, mode='Train Stats')
         val_loss, val_acc = validate(val_loader, ema_model, criterion, epoch, use_cuda, mode='Valid Stats')
-        test_loss, test_acc = validate(test_loader, ema_model, criterion, epoch, use_cuda, mode='Test Stats ')
+        if test_loader is not None:
+            test_loss, test_acc = validate(test_loader, ema_model, criterion, epoch, use_cuda, mode='Test Stats ')
+        else:
+            test_loss, test_acc = [-1, -1]
 
         step = args.val_iteration * (epoch + 1)
 
@@ -206,10 +222,18 @@ def train(labeled_trainloader, unlabeled_trainloader, model, optimizer, ema_opti
             inputs_x, targets_x = labeled_train_iter.next()
 
         try:
-            (inputs_u, inputs_u2), _ = unlabeled_train_iter.next()
+            if args.dataset == 'STL10':
+                inputs_u, _ = unlabeled_train_iter.next()
+                inputs_u2, _ = unlabeled_train_iter.next()
+            else:
+                (inputs_u, inputs_u2), _ = unlabeled_train_iter.next()
         except:
             unlabeled_train_iter = iter(unlabeled_trainloader)
-            (inputs_u, inputs_u2), _ = unlabeled_train_iter.next()
+            if args.dataset == 'STL10':
+                inputs_u, _ = unlabeled_train_iter.next()
+                inputs_u2, _ = unlabeled_train_iter.next()
+            else:
+                (inputs_u, inputs_u2), _ = unlabeled_train_iter.next()
 
         # measure data loading time
         data_time.update(time.time() - end)
