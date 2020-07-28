@@ -43,8 +43,8 @@ parser.add_argument('--gpu', default='0', type=str,
 #Method options
 parser.add_argument('--n-labeled', type=int, default=250,
                         help='Number of labeled data')
-parser.add_argument('--val-iteration', type=int, default=1024,
-                        help='Number of labeled data')
+parser.add_argument('--train-iteration', type=int, default=1024,
+                        help='Number of iteration per epoch')
 parser.add_argument('--out', default='result',
                         help='Directory to output the result')
 parser.add_argument('--alpha', default=0.75, type=float)
@@ -148,7 +148,7 @@ def main():
         val_loss, val_acc = validate(val_loader, ema_model, criterion, epoch, use_cuda, mode='Valid Stats')
         test_loss, test_acc = validate(test_loader, ema_model, criterion, epoch, use_cuda, mode='Test Stats ')
 
-        step = args.val_iteration * (epoch + 1)
+        step = args.train_iteration * (epoch + 1)
 
         writer.add_scalar('losses/train_loss', train_loss, step)
         writer.add_scalar('losses/valid_loss', val_loss, step)
@@ -193,12 +193,12 @@ def train(labeled_trainloader, unlabeled_trainloader, model, optimizer, ema_opti
     ws = AverageMeter()
     end = time.time()
 
-    bar = Bar('Training', max=args.val_iteration)
+    bar = Bar('Training', max=args.train_iteration)
     labeled_train_iter = iter(labeled_trainloader)
     unlabeled_train_iter = iter(unlabeled_trainloader)
 
     model.train()
-    for batch_idx in range(args.val_iteration):
+    for batch_idx in range(args.train_iteration):
         try:
             inputs_x, targets_x = labeled_train_iter.next()
         except:
@@ -263,7 +263,7 @@ def train(labeled_trainloader, unlabeled_trainloader, model, optimizer, ema_opti
         logits_x = logits[0]
         logits_u = torch.cat(logits[1:], dim=0)
 
-        Lx, Lu, w = criterion(logits_x, mixed_target[:batch_size], logits_u, mixed_target[batch_size:], epoch+batch_idx/args.val_iteration)
+        Lx, Lu, w = criterion(logits_x, mixed_target[:batch_size], logits_u, mixed_target[batch_size:], epoch+batch_idx/args.train_iteration)
 
         loss = Lx + w * Lu
 
@@ -286,7 +286,7 @@ def train(labeled_trainloader, unlabeled_trainloader, model, optimizer, ema_opti
         # plot progress
         bar.suffix  = '({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Loss_x: {loss_x:.4f} | Loss_u: {loss_u:.4f} | W: {w:.4f}'.format(
                     batch=batch_idx + 1,
-                    size=args.val_iteration,
+                    size=args.train_iteration,
                     data=data_time.avg,
                     bt=batch_time.avg,
                     total=bar.elapsed_td,
