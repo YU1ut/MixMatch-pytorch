@@ -43,7 +43,7 @@ parser.add_argument('--gpu', default='0', type=str,
 #Method options
 parser.add_argument('--n-labeled', type=int, default=250,
                         help='Number of labeled data')
-parser.add_argument('--train-iteration', type=int, default=1024,
+parser.add_argument('--train-iteration', type=int, default=8,
                         help='Number of iteration per epoch')
 parser.add_argument('--out', default='result',
                         help='Directory to output the result')
@@ -66,6 +66,11 @@ if args.manualSeed is None:
 np.random.seed(args.manualSeed)
 
 best_acc = 0  # best test accuracy
+
+class MyCrossEntropy(nn.CrossEntropyLoss):
+    def forward(self, _input, target):
+        target = target.long()
+        return F.cross_entropy(_input, target, weight=self.weight, ignore_index=self.ignore_index, reduction=self.reduction)
 
 def main():
     global best_acc
@@ -111,7 +116,8 @@ def main():
     print('    Total params: %.2fM' % (sum(p.numel() for p in model.parameters())/1000000.0))
 
     train_criterion = SemiLoss()
-    criterion = nn.CrossEntropyLoss()
+    #criterion = nn.CrossEntropyLoss()
+    criterion = MyCrossEntropy()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     ema_optimizer= WeightEMA(model, ema_model, alpha=args.ema_decay)
