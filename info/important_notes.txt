@@ -1,0 +1,40 @@
+Batch Normalization and interleaving:
+    When doing the following operations:
+        idx = torch.randperm(all_inputs.size(0))
+
+        input_a, input_b = all_inputs, all_inputs[idx]
+        target_a, target_b = all_targets, all_targets[idx]
+    We must take into account that the model has batch normalization on its
+    first layer. This is a problem because the first "batch_size" elements
+    of "input_a" are from the labeled batch and the rest are from the two
+    unlabeled batches of input. We interleave these 3 in order to have each
+    of the original 3 batches equally represented (in the number of elements)
+    in the the output batches.
+
+    WARNING: We do this to fix the bias regarding batch normalization but
+    after we make the prediction with the model we have to put the logits
+    back to the order they were in originally so as to not affect the logic
+    of the loss function.
+        # calculate the logits
+        logits = [model(mixed_input[0])]
+        for _input in mixed_input[1:]:
+            logits.append(model(_input))
+
+        # put interleaved samples back in order to preserve the logic of
+        # the loss function
+        logits = interleave(logits, batch_size)
+
+Hardwired to K == 2:
+    The mixmatch algorithm uses two batches of data: 1 labeled, 1 unlabeled.
+    It applies augmentations to the unlabeled batch k times and mixes these
+    k batches together with the labeled batch. 
+
+    In dataset.TransformTwice we can see how the author hardwired the K
+    parameter from the paper to be equal to 2.
+
+    TODO: rewrite the code so it generalises to arbitrary K
+
+
+RUN FASTER:
+    Try to use more of the gpu; Ideas:
+        - Use a larger batch size and fewer train iterations
