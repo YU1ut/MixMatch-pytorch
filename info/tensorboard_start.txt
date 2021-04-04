@@ -1,0 +1,2 @@
+"python -m tensorboard.main --logdir=cifar10@250" 
+http://localhost:6006
