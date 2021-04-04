@@ -43,7 +43,7 @@ parser.add_argument('--gpu', default='0', type=str,
 #Method options
 parser.add_argument('--n-labeled', type=int, default=250,
                         help='Number of labeled data')
-parser.add_argument('--train-iteration', type=int, default=8,
+parser.add_argument('--train-iteration', type=int, default=1024,
                         help='Number of iteration per epoch')
 parser.add_argument('--out', default='result',
                         help='Directory to output the result')
@@ -65,20 +65,62 @@ if args.manualSeed is None:
     args.manualSeed = random.randint(1, 10000)
 np.random.seed(args.manualSeed)
 
-best_acc = 0  # best test accuracy
+class TrainState:
+    def __init__(self, model, ema_model):
+        self.best_acc = 0
+        self.start_epoch = 0
+        self.model = model
+        self.ema_model = ema_model
+        
+        self.train_criterion = SemiLoss()
+        self.criterion = MyCrossEntropy()
+        self.optimizer = optim.Adam(model.parameters(), lr=args.lr)
+        self.ema_optimizer = WeightEMA(model, ema_model, alpha=args.ema_decay)
+
+
+    def handle_resume(self):
+        title = 'noisy-cifar-10'
+        if args.resume:
+            # Load checkpoint.
+            print('==> Resuming from checkpoint..')
+            assert os.path.isfile(args.resume), 'Error: no checkpoint directory found!'
+            args.out = os.path.dirname(args.resume)
+            checkpoint = torch.load(args.resume)
+            self.best_acc = checkpoint['best_acc']
+            self.start_epoch = checkpoint['epoch']
+            self.model.load_state_dict(checkpoint['state_dict'])
+            self.ema_model.load_state_dict(checkpoint['ema_state_dict'])
+            self.optimizer.load_state_dict(checkpoint['optimizer'])
+            self.logger = Logger(os.path.join(args.out, 'log.txt'), title=title, resume=True)
+        else:
+            self.logger = Logger(os.path.join(args.out, 'log.txt'), title=title)
+            self.logger.set_names(['Train Loss', 'Train Loss X', 'Train Loss U',  'Valid Loss', 'Valid Acc.', 'Test Loss', 'Test Acc.'])
+
+    def save_checkpoint(self, val_acc, epoch):
+        is_best = val_acc > self.best_acc
+        self.best_acc = max(val_acc, self.best_acc)
+        state = {
+            'epoch': epoch + 1,
+            'state_dict': self.model.state_dict(),
+            'ema_state_dict': self.ema_model.state_dict(),
+            'acc': val_acc,
+            'best_acc': self.best_acc,
+            'optimizer' : self.optimizer.state_dict(),
+        }
+        checkpoint = args.out
+        filename = 'checkpoint.pth.tar'
+
+        filepath = os.path.join(checkpoint, filename)
+        torch.save(state, filepath)
+        if is_best:
+            shutil.copyfile(filepath, os.path.join(checkpoint, 'model_best.pth.tar'))
 
 class MyCrossEntropy(nn.CrossEntropyLoss):
     def forward(self, _input, target):
         target = target.long()
         return F.cross_entropy(_input, target, weight=self.weight, ignore_index=self.ignore_index, reduction=self.reduction)
 
-def main():
-    global best_acc
-
-    if not os.path.isdir(args.out):
-        mkdir_p(args.out)
-
-    # Data
+def get_cifar10_default():
     print(f'==> Preparing cifar10')
     transform_train = transforms.Compose([
         dataset.RandomPadandCrop(32),
@@ -96,7 +138,9 @@ def main():
     val_loader = data.DataLoader(val_set, batch_size=args.batch_size, shuffle=False, num_workers=0)
     test_loader = data.DataLoader(test_set, batch_size=args.batch_size, shuffle=False, num_workers=0)
 
-    # Model
+    return labeled_trainloader, unlabeled_trainloader, val_loader, test_loader
+
+def get_wideresnet_models():
     print("==> creating WRN-28-2")
 
     def create_model(ema=False):
@@ -111,48 +155,38 @@ def main():
 
     model = create_model()
     ema_model = create_model(ema=True)
+    return model, ema_model
 
+def main():
+    # enable cudnn auto-tuner to find the best algorithm for the given harware
     cudnn.benchmark = True
+
+    if not os.path.isdir(args.out):
+        mkdir_p(args.out)
+
+    labeled_trainloader, unlabeled_trainloader, val_loader, test_loader = \
+            get_cifar10_default()
+
+    model, ema_model = get_wideresnet_models()
+    ts = TrainState(model, ema_model)
+
     print('    Total params: %.2fM' % (sum(p.numel() for p in model.parameters())/1000000.0))
 
-    train_criterion = SemiLoss()
-    #criterion = nn.CrossEntropyLoss()
-    criterion = MyCrossEntropy()
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
-
-    ema_optimizer= WeightEMA(model, ema_model, alpha=args.ema_decay)
-    start_epoch = 0
-
-    # Resume
-    title = 'noisy-cifar-10'
-    if args.resume:
-        # Load checkpoint.
-        print('==> Resuming from checkpoint..')
-        assert os.path.isfile(args.resume), 'Error: no checkpoint directory found!'
-        args.out = os.path.dirname(args.resume)
-        checkpoint = torch.load(args.resume)
-        best_acc = checkpoint['best_acc']
-        start_epoch = checkpoint['epoch']
-        model.load_state_dict(checkpoint['state_dict'])
-        ema_model.load_state_dict(checkpoint['ema_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer'])
-        logger = Logger(os.path.join(args.out, 'log.txt'), title=title, resume=True)
-    else:
-        logger = Logger(os.path.join(args.out, 'log.txt'), title=title)
-        logger.set_names(['Train Loss', 'Train Loss X', 'Train Loss U',  'Valid Loss', 'Valid Acc.', 'Test Loss', 'Test Acc.'])
+    ts.handle_resume()
 
     writer = SummaryWriter(args.out)
     step = 0
     test_accs = []
     # Train and val
-    for epoch in range(start_epoch, args.epochs):
+    for epoch in range(ts.start_epoch, args.epochs):
 
         print('\nEpoch: [%d | %d] LR: %f' % (epoch + 1, args.epochs, state['lr']))
+        #print('\nEpoch: [%d | %d] LR: %f' % (epoch + 1, args.epochs, args.lr))
 
-        train_loss, train_loss_x, train_loss_u = train(labeled_trainloader, unlabeled_trainloader, model, optimizer, ema_optimizer, train_criterion, epoch, use_cuda)
-        _, train_acc = validate(labeled_trainloader, ema_model, criterion, epoch, use_cuda, mode='Train Stats')
-        val_loss, val_acc = validate(val_loader, ema_model, criterion, epoch, use_cuda, mode='Valid Stats')
-        test_loss, test_acc = validate(test_loader, ema_model, criterion, epoch, use_cuda, mode='Test Stats ')
+        train_loss, train_loss_x, train_loss_u = train(labeled_trainloader, unlabeled_trainloader, epoch, use_cuda, ts)
+        _, train_acc = validate(labeled_trainloader, ts.ema_model, ts.criterion, epoch, use_cuda, mode='Train Stats')
+        val_loss, val_acc = validate(val_loader, ts.ema_model, ts.criterion, epoch, use_cuda, mode='Valid Stats')
+        test_loss, test_acc = validate(test_loader, ts.ema_model, ts.criterion, epoch, use_cuda, mode='Test Stats ')
 
         step = args.train_iteration * (epoch + 1)
 
@@ -165,31 +199,86 @@ def main():
         writer.add_scalar('accuracy/test_acc', test_acc, step)
 
         # append logger file
-        logger.append([train_loss, train_loss_x, train_loss_u, val_loss, val_acc, test_loss, test_acc])
+        ts.logger.append([train_loss, train_loss_x, train_loss_u, val_loss, val_acc, test_loss, test_acc])
 
         # save model
-        is_best = val_acc > best_acc
-        best_acc = max(val_acc, best_acc)
-        save_checkpoint({
-                'epoch': epoch + 1,
-                'state_dict': model.state_dict(),
-                'ema_state_dict': ema_model.state_dict(),
-                'acc': val_acc,
-                'best_acc': best_acc,
-                'optimizer' : optimizer.state_dict(),
-            }, is_best)
+        ts.save_checkpoint(val_acc, epoch)
         test_accs.append(test_acc)
-    logger.close()
+
+    ts.logger.close()
     writer.close()
 
     print('Best acc:')
-    print(best_acc)
+    print(ts.best_acc)
 
     print('Mean acc:')
     print(np.mean(test_accs[-20:]))
 
+def iterate_with_restart(loader, iterator):
+    try:
+        inputs, targets = iterator.next()
+    except:
+        iterator = iter(loader)
+        inputs, targets = iterator.next()
 
-def train(labeled_trainloader, unlabeled_trainloader, model, optimizer, ema_optimizer, criterion, epoch, use_cuda):
+    return iterator, inputs, targets
+
+
+def guess_labels(inputs_u1, inputs_u2, model):
+    with torch.no_grad():
+        # compute guessed labels of unlabel samples
+        outputs_u1 = model(inputs_u1)
+        outputs_u2 = model(inputs_u2)
+        p = (torch.softmax(outputs_u1, dim=1) + torch.softmax(outputs_u2, dim=1)) / 2
+        pt = p**(1/args.T)
+        targets_u = pt / pt.sum(dim=1, keepdim=True)
+        targets_u = targets_u.detach()
+
+    return targets_u
+
+def mixup(inputs_x, inputs_u1, inputs_u2, targets_x, targets_u):
+    all_inputs = torch.cat([inputs_x, inputs_u1, inputs_u2], dim=0)
+    all_targets = torch.cat([targets_x, targets_u, targets_u], dim=0)
+
+    l = np.random.beta(args.alpha, args.alpha)
+
+    l = max(l, 1-l)
+
+    idx = torch.randperm(all_inputs.size(0))
+
+    input_a, input_b = all_inputs, all_inputs[idx]
+    target_a, target_b = all_targets, all_targets[idx]
+
+    mixed_input = l * input_a + (1 - l) * input_b
+    mixed_target = l * target_a + (1 - l) * target_b
+
+    return mixed_input, mixed_target
+
+def predict_train(model, mixed_input):
+    # interleave labeled and unlabed samples between batches to 
+    # get correct batchnorm calculation 
+    batch_size = args.batch_size
+
+    mixed_input = list(torch.split(mixed_input, batch_size))
+    mixed_input = interleave(mixed_input, batch_size)
+
+    logits = [model(mixed_input[0])]
+    for _input in mixed_input[1:]:
+        logits.append(model(_input))
+
+    # put interleaved samples back
+    logits = interleave(logits, batch_size)
+    logits_x = logits[0]
+    logits_u = torch.cat(logits[1:], dim=0)
+
+    return logits_x, logits_u
+
+def train(labeled_trainloader, unlabeled_trainloader, epoch, use_cuda, 
+        train_state):
+    model = train_state.model
+    optimizer = train_state.optimizer
+    ema_optimizer = train_state.ema_optimizer
+    criterion = train_state.train_criterion
 
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -205,17 +294,15 @@ def train(labeled_trainloader, unlabeled_trainloader, model, optimizer, ema_opti
 
     model.train()
     for batch_idx in range(args.train_iteration):
-        try:
-            inputs_x, targets_x = labeled_train_iter.next()
-        except:
-            labeled_train_iter = iter(labeled_trainloader)
-            inputs_x, targets_x = labeled_train_iter.next()
+        labeled_train_iter, inputs_x, targets_x = \
+            iterate_with_restart(labeled_trainloader, labeled_train_iter)
+        unlabeled_train_iter, (inputs_u1, inputs_u2), _ = \
+            iterate_with_restart(unlabeled_trainloader, unlabeled_train_iter)
 
-        try:
-            (inputs_u, inputs_u2), _ = unlabeled_train_iter.next()
-        except:
-            unlabeled_train_iter = iter(unlabeled_trainloader)
-            (inputs_u, inputs_u2), _ = unlabeled_train_iter.next()
+        #if use_cuda:
+        #    inputs_x  = inputs_x.cuda(non_blocking = True)
+        #    inputs_u1 = inputs_u1.cuda(non_blocking = True)
+        #    inputs_u2 = inputs_u2.cuda(non_blocking = True)
 
         # measure data loading time
         data_time.update(time.time() - end)
@@ -227,50 +314,22 @@ def train(labeled_trainloader, unlabeled_trainloader, model, optimizer, ema_opti
 
         if use_cuda:
             inputs_x, targets_x = inputs_x.cuda(), targets_x.cuda(non_blocking=True)
-            inputs_u = inputs_u.cuda()
+            inputs_u1 = inputs_u1.cuda()
             inputs_u2 = inputs_u2.cuda()
 
+        #if use_cuda:
+        #    targets_x = targets_x.cuda(non_blocking = True)
 
-        with torch.no_grad():
-            # compute guessed labels of unlabel samples
-            outputs_u = model(inputs_u)
-            outputs_u2 = model(inputs_u2)
-            p = (torch.softmax(outputs_u, dim=1) + torch.softmax(outputs_u2, dim=1)) / 2
-            pt = p**(1/args.T)
-            targets_u = pt / pt.sum(dim=1, keepdim=True)
-            targets_u = targets_u.detach()
+        targets_u = guess_labels(inputs_u1, inputs_u2, model)
 
-        # mixup
-        all_inputs = torch.cat([inputs_x, inputs_u, inputs_u2], dim=0)
-        all_targets = torch.cat([targets_x, targets_u, targets_u], dim=0)
+        mixed_input, mixed_target = mixup(inputs_x, inputs_u1, inputs_u2,
+                                        targets_x, targets_u)
+        
+        logits_x, logits_u = predict_train(model, mixed_input)
 
-        l = np.random.beta(args.alpha, args.alpha)
-
-        l = max(l, 1-l)
-
-        idx = torch.randperm(all_inputs.size(0))
-
-        input_a, input_b = all_inputs, all_inputs[idx]
-        target_a, target_b = all_targets, all_targets[idx]
-
-        mixed_input = l * input_a + (1 - l) * input_b
-        mixed_target = l * target_a + (1 - l) * target_b
-
-        # interleave labeled and unlabed samples between batches to get correct batchnorm calculation 
-        mixed_input = list(torch.split(mixed_input, batch_size))
-        mixed_input = interleave(mixed_input, batch_size)
-
-        logits = [model(mixed_input[0])]
-        for input in mixed_input[1:]:
-            logits.append(model(input))
-
-        # put interleaved samples back
-        logits = interleave(logits, batch_size)
-        logits_x = logits[0]
-        logits_u = torch.cat(logits[1:], dim=0)
-
-        Lx, Lu, w = criterion(logits_x, mixed_target[:batch_size], logits_u, mixed_target[batch_size:], epoch+batch_idx/args.train_iteration)
-
+        Lx, Lu, w = criterion(logits_x, mixed_target[:batch_size], 
+                            logits_u, mixed_target[batch_size:], 
+                            epoch+batch_idx/args.train_iteration)
         loss = Lx + w * Lu
 
         # record loss
@@ -342,7 +401,7 @@ def validate(valloader, model, criterion, epoch, use_cuda, mode):
             end = time.time()
 
             # plot progress
-            bar.suffix  = '({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | top1: {top1: .4f} | top5: {top5: .4f}'.format(
+            """bar.suffix  = '({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | top1: {top1: .4f} | top5: {top5: .4f}'.format(
                         batch=batch_idx + 1,
                         size=len(valloader),
                         data=data_time.avg,
@@ -353,15 +412,10 @@ def validate(valloader, model, criterion, epoch, use_cuda, mode):
                         top1=top1.avg,
                         top5=top5.avg,
                         )
-            bar.next()
+            bar.next()"""
         bar.finish()
     return (losses.avg, top1.avg)
 
-def save_checkpoint(state, is_best, checkpoint=args.out, filename='checkpoint.pth.tar'):
-    filepath = os.path.join(checkpoint, filename)
-    torch.save(state, filepath)
-    if is_best:
-        shutil.copyfile(filepath, os.path.join(checkpoint, 'model_best.pth.tar'))
 
 def linear_rampup(current, rampup_length=args.epochs):
     if rampup_length == 0:
@@ -412,6 +466,7 @@ def interleave_offsets(batch, nu):
 
 
 def interleave(xy, batch):
+    #print(xy[0].shape)
     nu = len(xy) - 1
     offsets = interleave_offsets(batch, nu)
     xy = [[v[offsets[p]:offsets[p + 1]] for p in range(nu + 1)] for v in xy]
