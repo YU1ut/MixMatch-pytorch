@@ -299,10 +299,10 @@ def train(labeled_trainloader, unlabeled_trainloader, epoch, use_cuda,
         unlabeled_train_iter, (inputs_u1, inputs_u2), _ = \
             iterate_with_restart(unlabeled_trainloader, unlabeled_train_iter)
 
-        #if use_cuda:
-        #    inputs_x  = inputs_x.cuda(non_blocking = True)
-        #    inputs_u1 = inputs_u1.cuda(non_blocking = True)
-        #    inputs_u2 = inputs_u2.cuda(non_blocking = True)
+        if use_cuda:
+            inputs_x  = inputs_x.cuda(non_blocking = True)
+            inputs_u1 = inputs_u1.cuda(non_blocking = True)
+            inputs_u2 = inputs_u2.cuda(non_blocking = True)
 
         # measure data loading time
         data_time.update(time.time() - end)
@@ -313,12 +313,7 @@ def train(labeled_trainloader, unlabeled_trainloader, epoch, use_cuda,
         targets_x = torch.zeros(batch_size, 10).scatter_(1, targets_x.view(-1,1).long(), 1)
 
         if use_cuda:
-            inputs_x, targets_x = inputs_x.cuda(), targets_x.cuda(non_blocking=True)
-            inputs_u1 = inputs_u1.cuda()
-            inputs_u2 = inputs_u2.cuda()
-
-        #if use_cuda:
-        #    targets_x = targets_x.cuda(non_blocking = True)
+            targets_x = targets_x.cuda(non_blocking = True)
 
         targets_u = guess_labels(inputs_u1, inputs_u2, model)
 
