@@ -50,7 +50,7 @@ def train_val_split(labels, n_labeled_per_class):
 cifar10_mean = (0.4914, 0.4822, 0.4465) # equals np.mean(train_set.train_data, axis=(0,1,2))/255
 cifar10_std = (0.2471, 0.2435, 0.2616) # equals np.std(train_set.train_data, axis=(0,1,2))/255
 
-def normalise(x, mean=cifar10_mean, std=cifar10_std):
+def normalize(x, mean=cifar10_mean, std=cifar10_std):
     x, mean, std = [np.array(a, np.float32) for a in (x, mean, std)]
     x -= mean*255
     x *= 1.0/(255*std)
@@ -126,7 +126,7 @@ class CIFAR10_labeled(torchvision.datasets.CIFAR10):
         if indexs is not None:
             self.data = self.data[indexs]
             self.targets = np.array(self.targets)[indexs]
-        self.data = transpose(normalise(self.data))
+        self.data = transpose(normalize(self.data))
 
     def __getitem__(self, index):
         """
