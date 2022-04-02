@@ -1,4 +1,4 @@
-# MixMatch
+# MixMatch-pytorch-customized-dataset
 
 This is a PyTorch implementation of MixMatch, which allows training with customized dataset.
 
