@@ -38,11 +38,11 @@ Check code environment "requirements.txt".
    
 2. Parameter settting by users. For example, update the number of labeled data for training.
 
-3. Train the model in SSL:
+3. Train the model in SSL mode:
 
    python train_SSL.py
 
-4. Train the model in TL:
+4. Train the model in TL mode:
 
    python train_TL.py
 
