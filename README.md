@@ -14,7 +14,7 @@ In addition, I adjusted the code structure of the original Pytorch implementatio
 
    Revised the dataset part to allow customized dataset for training.
    
-   Revised the original MixMatch loss function by considering the potential class imbalance issue in the labeled data.
+   Revised the original MixMatch loss function by considering the potential class imbalance issue in the training data.
   
 2. train_TL.py
    
