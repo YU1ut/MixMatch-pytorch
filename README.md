@@ -11,11 +11,13 @@ Two revised training functions are updated compared to the original forked [repo
 1. train_SSL.py
 
    Revised the dataset part to allow customized dataset for training.
+   
    Revised the original MixMatch loss function by considering the potential class imbalance issue in the labeled data.
   
 2. train_TL.py
    
    This is a simple baseline training process by supervised learning only using labeled data with the same number as that of SSL training.
+   
    This allows performance evaluation with SSL training.
 
 ## Usage
@@ -26,17 +28,22 @@ Check code environment "requirements.txt".
 
 ### Train
 
-1. Customized dataset preparation
+1. Customized dataset preparation.
+
    Put the data under "dataset/".
+   
    Put the training/validatioin/test txt under the current location.
+   
    Update the path information both in the train_SSL.py and train_TL.py.
    
 2. Parameter settting by users. For example, update the number of labeled data for training.
 
 3. Train the model in SSL:
+
    python train_SSL.py
 
 4. Train the model in TL:
+
    python train_TL.py
 
 
