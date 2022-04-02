@@ -16,7 +16,7 @@ Two revised training functions are updated compared to the original forked [repo
 2. train_TL.py
    
    This is a simple baseline training process by supervised learning only using labeled data with the same number as that of SSL training.
-   This allows performance evaluation.
+   This allows performance evaluation with SSL training.
 
 ## Usage
 
