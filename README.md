@@ -8,7 +8,10 @@ The official Tensorflow implementation is [here](https://github.com/google-resea
 
 Two revised training functions are updated compared to the original forked [repository](https://github.com/YU1ut/MixMatch-pytorch).
 
+
 In addition, I adjusted the code structure of the original Pytorch implementation and made necessary notes for better understanding.
+
+train.py is the original Pytorch Implementation of [that](https://github.com/YU1ut/MixMatch-pytorch), which is trained on CIFAR-10 only.
 
 1. train_SSL.py
 
