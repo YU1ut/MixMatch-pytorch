@@ -1,24 +1,39 @@
 # MixMatch
-This is an unofficial PyTorch implementation of [MixMatch: A Holistic Approach to Semi-Supervised Learning](https://arxiv.org/abs/1905.02249). 
-The official Tensorflow implementation is [here](https://github.com/google-research/mixmatch).
 
-Now only experiments on CIFAR-10 are available.
+This is a PyTorch implementation of MixMatch, which allows training with customized dataset.
 
-This repository carefully implemented important details of the official implementation to reproduce the results.
+The official Tensorflow implementation is [here](https://github.com/google-research/mixmatch) and the forked Pytorch implementation is [here](https://github.com/YU1ut/MixMatch-pytorch)
 
+## Revision Note
 
-## Requirements
-- Python 3.6+
-- PyTorch 1.0
-- **torchvision 0.2.2 (older versions are not compatible with this code)** 
-- tensorboardX
-- progress
-- matplotlib
-- numpy
+Two revised training functions are updated compared to [repository](https://github.com/YU1ut/MixMatch-pytorch)
+
+1. train_anomaly_SSL.py
+
+   Revised the dataset part to allow customized dataset for training.
+   Revised the original MixMatch loss function by considering the potential class imbalance issue in the labeled data.
+  
+3. train_anomaly_TL.py
+   
+   This is a simple baseline training process by supervised learning only using labeled data with the same number as that of SSL training.
+   This allows performance evaluation.
 
 ## Usage
 
+### Environment
+
+Check code environment "requirements.txt"
+
 ### Train
+
+1. Customized dataset preparation
+   Put the data under "dataset/".
+   Put the training/validatioin/test txt under the current location.
+   Update the path information in the train_anomaly_SSL.py 
+   
+   
+
+
 Train the model by 250 labeled data of CIFAR-10 dataset:
 
 ```
