@@ -1,48 +1,56 @@
-# MixMatch
-This is an unofficial PyTorch implementation of [MixMatch: A Holistic Approach to Semi-Supervised Learning](https://arxiv.org/abs/1905.02249). 
-The official Tensorflow implementation is [here](https://github.com/google-research/mixmatch).
+MixMatch-pytorch-customized-dataset
 
-Now only experiments on CIFAR-10 are available.
+This is a PyTorch implementation of MixMatch, which allows training with customized dataset.
 
-This repository carefully implemented important details of the official implementation to reproduce the results.
+The official Tensorflow implementation is [here](https://github.com/google-research/mixmatch) and the forked Pytorch implementation is [here](https://github.com/YU1ut/MixMatch-pytorch).
+
+## Revision Note
+
+Two revised training functions are updated compared to the original forked [repository](https://github.com/YU1ut/MixMatch-pytorch).
 
 
-## Requirements
-- Python 3.6+
-- PyTorch 1.0
-- **torchvision 0.2.2 (older versions are not compatible with this code)** 
-- tensorboardX
-- progress
-- matplotlib
-- numpy
+In addition, I adjusted the code structure of the original Pytorch implementation and made necessary notes for better understanding.
+
+train.py is the original Pytorch Implementation of [that](https://github.com/YU1ut/MixMatch-pytorch), which is trained on CIFAR-10 only.
+
+1. train_SSL.py
+
+   Revised the dataset part to allow customized dataset for training.
+
+   Revised the original MixMatch loss function by considering the potential class imbalance issue in the training data.
+
+2. train_TL.py
+
+   This is a simple baseline training process by supervised learning only using labeled data with the same number as that of SSL training.
+
+   This allows performance evaluation with SSL training.
 
 ## Usage
 
+### Environment
+
+Check code environment "requirements.txt".
+
 ### Train
-Train the model by 250 labeled data of CIFAR-10 dataset:
 
-```
-python train.py --gpu <gpu_id> --n-labeled 250 --out cifar10@250
-```
+1. Customized dataset preparation.
 
-Train the model by 4000 labeled data of CIFAR-10 dataset:
+   Put the data under "dataset/".
 
-```
-python train.py --gpu <gpu_id> --n-labeled 4000 --out cifar10@4000
-```
+   Put the training/validatioin/test txt under the current location.
 
-### Monitoring training progress
-```
-tensorboard.sh --port 6006 --logdir cifar10@250
-```
+   Update the path information both in the train_SSL.py and train_TL.py.
 
-## Results (Accuracy)
-| #Labels | 250 | 500 | 1000 | 2000| 4000 |
-|:---|:---:|:---:|:---:|:---:|:---:|
-|Paper | 88.92 ± 0.87 | 90.35 ± 0.94 | 92.25 ± 0.32| 92.97 ± 0.15 |93.76 ± 0.06|
-|This code | 88.71 | 88.96 | 90.52 | 92.23 | 93.52 |
+2. Parameter settting by users. For example, update the number of labeled data for training.
 
-(Results of this code were evaluated on 1 run. Results of 5 runs with different seeds will be updated later. )
+3. Train the model in SSL mode:
+
+   python train_SSL.py
+
+4. Train the model in TL mode:
+
+   python train_TL.py
+
 
 ## References
 ```
@@ -53,3 +61,5 @@ tensorboard.sh --port 6006 --logdir cifar10@250
   year={2019}
 }
 ```
+
+
