@@ -320,7 +320,8 @@ def validate(valloader, model, criterion, epoch, use_cuda, mode):
             data_time.update(time.time() - end)
 
             if use_cuda:
-                inputs, targets = inputs.cuda(), targets.cuda(non_blocking=True)
+                inputs = inputs.cuda()
+                targets = targets.type(torch.LongTensor).cuda(non_blocking=True)
             # compute output
             outputs = model(inputs)
             loss = criterion(outputs, targets)
