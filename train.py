@@ -200,7 +200,7 @@ def train(labeled_trainloader, unlabeled_trainloader, model, optimizer, ema_opti
     model.train()
     for batch_idx in range(args.train_iteration):
         try:
-            labeled_train_iter = iter(labeled_trainloader)
+            inputs_x, targets_x = next(labeled_train_iter)
         except:
             labeled_train_iter = iter(labeled_trainloader)
             inputs_x, targets_x = next(labeled_train_iter)
