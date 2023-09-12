@@ -207,10 +207,11 @@ def train(labeled_trainloader, unlabeled_trainloader, model, optimizer, ema_opti
 
 
         try:
-            (inputs_u, inputs_u2), _ = unlabeled_train_iter.next()
+            (inputs_u, inputs_u2), _ = next(unlabeled_train_iter)
         except:
             unlabeled_train_iter = iter(unlabeled_trainloader)
-            (inputs_u, inputs_u2), _ = unlabeled_train_iter.next()
+            (inputs_u, inputs_u2), _ = next(unlabeled_train_iter)
+
 
         # measure data loading time
         data_time.update(time.time() - end)
