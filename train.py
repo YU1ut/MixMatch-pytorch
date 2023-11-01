@@ -14,11 +14,12 @@ import torch.nn.parallel
 import torch.optim as optim
 import torch.utils.data as data
 import torchvision.transforms as transforms
+from progress.bar import Bar
 from tensorboardX import SummaryWriter
 
 import dataset.cifar10 as dataset
 import models.wideresnet as models
-from utils import Bar, Logger, AverageMeter, accuracy, mkdir_p
+from utils import Logger, AverageMeter, accuracy, mkdir_p
 
 parser = argparse.ArgumentParser(description="PyTorch MixMatch Training")
 # Optimization options
@@ -305,14 +306,14 @@ def main():
 
 
 def train(
-        labeled_trainloader,
-        unlabeled_trainloader,
-        model,
-        optimizer,
-        ema_optimizer,
-        criterion,
-        epoch,
-        use_cuda,
+    labeled_trainloader,
+    unlabeled_trainloader,
+    model,
+    optimizer,
+    ema_optimizer,
+    criterion,
+    epoch,
+    use_cuda,
 ):
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -362,9 +363,9 @@ def train(
             outputs_u = model(inputs_u)
             outputs_u2 = model(inputs_u2)
             p = (
-                        torch.softmax(outputs_u, dim=1)
-                        + torch.softmax(outputs_u2, dim=1)
-                ) / 2
+                torch.softmax(outputs_u, dim=1)
+                + torch.softmax(outputs_u2, dim=1)
+            ) / 2
             pt = p ** (1 / args.T)
             targets_u = pt / pt.sum(dim=1, keepdim=True)
             targets_u = targets_u.detach()
@@ -500,7 +501,7 @@ def validate(valloader, model, criterion, epoch, use_cuda, mode):
 
 
 def save_checkpoint(
-        state, is_best, checkpoint=args.out, filename="checkpoint.pth.tar"
+    state, is_best, checkpoint=args.out, filename="checkpoint.pth.tar"
 ):
     filepath = os.path.join(checkpoint, filename)
     torch.save(state, filepath)
@@ -566,7 +567,7 @@ def interleave_offsets(batch, nu):
 def interleave(xy, batch):
     nu = len(xy) - 1
     offsets = interleave_offsets(batch, nu)
-    xy = [[v[offsets[p]: offsets[p + 1]] for p in range(nu + 1)] for v in xy]
+    xy = [[v[offsets[p] : offsets[p + 1]] for p in range(nu + 1)] for v in xy]
     for i in range(1, nu + 1):
         xy[0][i], xy[i][i] = xy[i][i], xy[0][i]
     return [torch.cat(v, dim=0) for v in xy]
