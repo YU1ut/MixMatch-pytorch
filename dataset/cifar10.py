@@ -176,12 +176,9 @@ transform_val = transforms.Compose(
 )
 
 
-def get_cifar10(
-    root,
-    n_labeled,
-    batch_size,
-    download=True,
-):
+def get_cifar10(root, n_labeled, batch_size, download=True, seed=42):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
     base_dataset = torchvision.datasets.CIFAR10(root, train=True, download=download)
     train_labeled_idxs, train_unlabeled_idxs, val_idxs = train_val_split(
         base_dataset.targets, int(n_labeled / 10)
