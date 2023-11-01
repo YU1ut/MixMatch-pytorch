@@ -21,10 +21,15 @@ def mkdir_p(path):
 
 class AverageMeter(object):
     """Computes and stores the average and current value
-    Imported from https://github.com/pytorch/examples/blob/master/imagenet/main.py#L247-L262
+    Imported from
+    https://github.com/pytorch/examples/blob/master/imagenet/main.py#L247-L262
     """
 
     def __init__(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
         self.reset()
 
     def reset(self):

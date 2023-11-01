@@ -12,7 +12,7 @@ class Logger(object):
     def __init__(self, fpath, title=None, resume=False):
         self.file = None
         self.resume = resume
-        self.title = "" if title == None else title
+        self.title = "" if title is None else title
         if fpath is not None:
             if resume:
                 self.file = open(fpath, "r")
@@ -54,7 +54,7 @@ class Logger(object):
         self.file.flush()
 
     def plot(self, names=None):
-        names = self.names if names == None else names
+        names = self.names if names is None else names
         numbers = self.numbers
         for _, name in enumerate(names):
             x = np.arange(len(numbers[name]))
