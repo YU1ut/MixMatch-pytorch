@@ -14,9 +14,9 @@ from progress.bar import Bar
 from tensorboardX import SummaryWriter
 from torch.utils.data import DataLoader
 
-import dataset.cifar10 as dataset
-import models.wideresnet as models
-from utils import Logger, AverageMeter, accuracy, mkdir_p
+import mixmatch.dataset.cifar10 as dataset
+import mixmatch.models.wideresnet as models
+from utils import mkdir_p, AverageMeter, accuracy, Logger
 
 EPOCHS: int = 1024
 START_EPOCH: int = 0
