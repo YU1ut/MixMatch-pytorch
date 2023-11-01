@@ -112,7 +112,10 @@ class NetworkBlock(nn.Module):
 
 
 class WideResNet(nn.Module):
-    def __init__(self, num_classes, depth=28, widen_factor=2, dropRate=0.0):
+    def __init__(
+        self, num_classes, depth=28, widen_factor=2, dropRate=0.0, seed=42
+    ):
+        torch.manual_seed(42)
         super(WideResNet, self).__init__()
         nChannels = [
             16,
