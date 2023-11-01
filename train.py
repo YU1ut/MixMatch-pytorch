@@ -465,7 +465,7 @@ def validate(valloader, model, criterion, epoch, use_cuda, mode):
             )
             bar.next()
         bar.finish()
-    return (losses.avg, top1.avg)
+    return losses.avg, top1.avg
 
 
 def save_checkpoint(

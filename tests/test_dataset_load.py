@@ -39,4 +39,3 @@ def test_load_seeded():
     assert np.all(test_targets_1 == test_targets_2)
 
     print(labeled_targets_1)
-    pass
