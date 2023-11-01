@@ -63,14 +63,18 @@ parser.add_argument(
     "--gpu", default="0", type=str, help="id(s) for CUDA_VISIBLE_DEVICES"
 )
 # Method options
-parser.add_argument("--n-labeled", type=int, default=250, help="Number of labeled data")
+parser.add_argument(
+    "--n-labeled", type=int, default=250, help="Number of labeled data"
+)
 parser.add_argument(
     "--train-iteration",
     type=int,
     default=1024,
     help="Number of iteration per epoch",
 )
-parser.add_argument("--out", default="result", help="Directory to output the result")
+parser.add_argument(
+    "--out", default="result", help="Directory to output the result"
+)
 parser.add_argument("--alpha", default=0.75, type=float)
 parser.add_argument("--lambda-u", default=75, type=float)
 parser.add_argument("--T", default=0.5, type=float)
@@ -83,13 +87,7 @@ state = {k: v for k, v in args._get_kwargs()}
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 use_cuda = torch.cuda.is_available()
 
-# Random seed
-# if args.manualSeed is None:
-#     args.manualSeed = random.randint(1, 10000)
-
 SEED = 42
-np.random.seed(SEED)
-torch.manual_seed(SEED)
 
 best_acc = 0  # best test accuracy
 
@@ -108,7 +106,9 @@ def main():
         unlabeled_trainloader,
         val_loader,
         test_loader,
-    ) = dataset.get_cifar10("./data", args.n_labeled)
+    ) = dataset.get_cifar10(
+        "./data", args.n_labeled, batch_size=args.batch_size, seed=SEED
+    )
 
     # Model
     print("==> creating WRN-28-2")
@@ -144,7 +144,9 @@ def main():
     if args.resume:
         # Load checkpoint.
         print("==> Resuming from checkpoint..")
-        assert os.path.isfile(args.resume), "Error: no checkpoint directory found!"
+        assert os.path.isfile(
+            args.resume
+        ), "Error: no checkpoint directory found!"
         args.out = os.path.dirname(args.resume)
         checkpoint = torch.load(args.resume)
         best_acc = checkpoint["best_acc"]
@@ -152,7 +154,9 @@ def main():
         model.load_state_dict(checkpoint["state_dict"])
         ema_model.load_state_dict(checkpoint["ema_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer"])
-        logger = Logger(os.path.join(args.out, "log.txt"), title=title, resume=True)
+        logger = Logger(
+            os.path.join(args.out, "log.txt"), title=title, resume=True
+        )
     else:
         logger = Logger(os.path.join(args.out, "log.txt"), title=title)
         logger.set_names(
@@ -171,7 +175,9 @@ def main():
     test_accs = []
     # Train and val
     for epoch in range(start_epoch, args.epochs):
-        print("\nEpoch: [%d | %d] LR: %f" % (epoch + 1, args.epochs, state["lr"]))
+        print(
+            "\nEpoch: [%d | %d] LR: %f" % (epoch + 1, args.epochs, state["lr"])
+        )
 
         train_loss, train_loss_x, train_loss_u = train(
             labeled_trainloader,
@@ -303,7 +309,9 @@ def train(
         )
 
         if use_cuda:
-            inputs_x, targets_x = inputs_x.cuda(), targets_x.cuda(non_blocking=True)
+            inputs_x, targets_x = inputs_x.cuda(), targets_x.cuda(
+                non_blocking=True
+            )
             inputs_u = inputs_u.cuda()
             inputs_u2 = inputs_u2.cuda()
 
@@ -311,7 +319,10 @@ def train(
             # compute guessed labels of unlabel samples
             outputs_u = model(inputs_u)
             outputs_u2 = model(inputs_u2)
-            p = (torch.softmax(outputs_u, dim=1) + torch.softmax(outputs_u2, dim=1)) / 2
+            p = (
+                torch.softmax(outputs_u, dim=1)
+                + torch.softmax(outputs_u2, dim=1)
+            ) / 2
             pt = p ** (1 / args.T)
             targets_u = pt / pt.sum(dim=1, keepdim=True)
             targets_u = targets_u.detach()
@@ -418,7 +429,9 @@ def validate(valloader, model, criterion, epoch, use_cuda, mode):
             data_time.update(time.time() - end)
 
             if use_cuda:
-                inputs, targets = inputs.cuda(), targets.cuda(non_blocking=True)
+                inputs, targets = inputs.cuda(), targets.cuda(
+                    non_blocking=True
+                )
             # compute output
             outputs = model(inputs)
             loss = criterion(outputs, targets.long())
@@ -455,11 +468,15 @@ def validate(valloader, model, criterion, epoch, use_cuda, mode):
     return (losses.avg, top1.avg)
 
 
-def save_checkpoint(state, is_best, checkpoint=args.out, filename="checkpoint.pth.tar"):
+def save_checkpoint(
+    state, is_best, checkpoint=args.out, filename="checkpoint.pth.tar"
+):
     filepath = os.path.join(checkpoint, filename)
     torch.save(state, filepath)
     if is_best:
-        shutil.copyfile(filepath, os.path.join(checkpoint, "model_best.pth.tar"))
+        shutil.copyfile(
+            filepath, os.path.join(checkpoint, "model_best.pth.tar")
+        )
 
 
 def linear_rampup(current, rampup_length=args.epochs):
@@ -474,7 +491,9 @@ class SemiLoss(object):
     def __call__(self, outputs_x, targets_x, outputs_u, targets_u, epoch):
         probs_u = torch.softmax(outputs_u, dim=1)
 
-        l_x = -torch.mean(torch.sum(F.log_softmax(outputs_x, dim=1) * targets_x, dim=1))
+        l_x = -torch.mean(
+            torch.sum(F.log_softmax(outputs_x, dim=1) * targets_x, dim=1)
+        )
         l_u = torch.mean((probs_u - targets_u) ** 2)
 
         return l_x, l_u, args.lambda_u * linear_rampup(epoch)
