@@ -1,6 +1,3 @@
-from __future__ import print_function
-
-import argparse
 import os
 import random
 import shutil
@@ -21,70 +18,40 @@ import dataset.cifar10 as dataset
 import models.wideresnet as models
 from utils import Logger, AverageMeter, accuracy, mkdir_p
 
-parser = argparse.ArgumentParser(description="PyTorch MixMatch Training")
-# Optimization options
-parser.add_argument(
-    "--epochs",
-    default=1024,
-    type=int,
-    metavar="N",
-    help="number of total epochs to run",
-)
-parser.add_argument(
-    "--start-epoch",
-    default=0,
-    type=int,
-    metavar="N",
-    help="manual epoch number (useful on restarts)",
-)
-parser.add_argument(
-    "--batch-size", default=64, type=int, metavar="N", help="train batchsize"
-)
-parser.add_argument(
-    "--lr",
-    "--learning-rate",
-    default=0.002,
-    type=float,
-    metavar="LR",
-    help="initial learning rate",
-)
-# Checkpoints
-parser.add_argument(
-    "--resume",
-    default="",
-    type=str,
-    metavar="PATH",
-    help="path to latest checkpoint (default: none)",
-)
-# Miscs
-parser.add_argument("--manualSeed", type=int, default=0, help="manual seed")
-# Device options
-parser.add_argument(
-    "--gpu", default="0", type=str, help="id(s) for CUDA_VISIBLE_DEVICES"
-)
-# Method options
-parser.add_argument(
-    "--n-labeled", type=int, default=250, help="Number of labeled data"
-)
-parser.add_argument(
-    "--train-iteration",
-    type=int,
-    default=1024,
-    help="Number of iteration per epoch",
-)
-parser.add_argument(
-    "--out", default="result", help="Directory to output the result"
-)
-parser.add_argument("--alpha", default=0.75, type=float)
-parser.add_argument("--lambda-u", default=75, type=float)
-parser.add_argument("--T", default=0.5, type=float)
-parser.add_argument("--ema-decay", default=0.999, type=float)
+EPOCHS: int = 1024
+START_EPOCH: int = 0
+MANUAL_SEED: int = 0
+RESUME: str = ""
+GPU: str = "0"
+OUT: str = "result"
+BATCH_SIZE: int = 64
+LR: float = 0.002
+N_LABELED: int = 250
+TRAIN_ITERATION: int = 1024
+EMA_DECAY: float = 0.999
+ALPHA: float = 0.75
+LAMBDA_U: float = 75
+T: float = 0.5
 
-args = parser.parse_args()
-state = {k: v for k, v in args._get_kwargs()}
+state = {
+    "epochs": EPOCHS,
+    "start_epoch": START_EPOCH,
+    "manual_seed": MANUAL_SEED,
+    "resume": RESUME,
+    "gpu": GPU,
+    "out": OUT,
+    "batch_size": BATCH_SIZE,
+    "lr": LR,
+    "n_labeled": N_LABELED,
+    "train_iteration": TRAIN_ITERATION,
+    "ema_decay": EMA_DECAY,
+    "alpha": ALPHA,
+    "lambda_u": LAMBDA_U,
+    "T": T,
+}
 
 # Use CUDA
-os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
+os.environ["CUDA_VISIBLE_DEVICES"] = GPU
 use_cuda = torch.cuda.is_available()
 
 SEED = 42
@@ -281,12 +248,12 @@ def train(
     ws = AverageMeter()
     end = time.time()
 
-    bar = Bar("Training", max=args.train_iteration)
+    bar = Bar("Training", max=TRAIN_ITERATION)
     labeled_train_iter = iter(labeled_trainloader)
     unlabeled_train_iter = iter(unlabeled_trainloader)
 
     model.train()
-    for batch_idx in range(args.train_iteration):
+    for batch_idx in range(TRAIN_ITERATION):
         try:
             inputs_x, targets_x = next(labeled_train_iter)
         except StopIteration:
@@ -324,7 +291,7 @@ def train(
                 torch.softmax(outputs_u, dim=1)
                 + torch.softmax(outputs_u2, dim=1)
             ) / 2
-            pt = p ** (1 / args.T)
+            pt = p ** (1 / T)
             targets_u = pt / pt.sum(dim=1, keepdim=True)
             targets_u = targets_u.detach()
 
@@ -332,7 +299,7 @@ def train(
         all_inputs = torch.cat([inputs_x, inputs_u, inputs_u2], dim=0)
         all_targets = torch.cat([targets_x, targets_u, targets_u], dim=0)
 
-        ratio = np.random.beta(args.alpha, args.alpha)
+        ratio = np.random.beta(ALPHA, ALPHA)
 
         ratio = max(ratio, 1 - ratio)
 
@@ -363,7 +330,7 @@ def train(
             mixed_target[:batch_size],
             logits_u,
             mixed_target[batch_size:],
-            epoch + batch_idx / args.train_iteration,
+            epoch + batch_idx / TRAIN_ITERATION,
         )
 
         loss = l_x + w * l_u
@@ -392,7 +359,7 @@ def train(
             "W: {w:.4f}"
         ).format(
             batch=batch_idx + 1,
-            size=args.train_iteration,
+            size=TRAIN_ITERATION,
             data=data_time.avg,
             bt=batch_time.avg,
             total=bar.elapsed_td,
@@ -479,7 +446,7 @@ def validate(
 def save_checkpoint(
     state,
     is_best: bool,
-    checkpoint: str = args.out,
+    checkpoint: str = OUT,
     filename: str = "checkpoint.pth.tar",
 ):
     filepath = os.path.join(checkpoint, filename)
@@ -490,7 +457,7 @@ def save_checkpoint(
         )
 
 
-def linear_rampup(current: int, rampup_length: int = args.epochs):
+def linear_rampup(current: int, rampup_length: int = EPOCHS):
     if rampup_length == 0:
         return 1.0
     else:
@@ -514,7 +481,7 @@ class SemiLoss(object):
         )
         l_u = torch.mean((probs_u - targets_u) ** 2)
 
-        return l_x, l_u, args.lambda_u * linear_rampup(epoch)
+        return l_x, l_u, LAMBDA_U * linear_rampup(epoch)
 
 
 class WeightEMA(object):
@@ -529,7 +496,7 @@ class WeightEMA(object):
         self.alpha = alpha
         self.params = list(model.state_dict().values())
         self.ema_params = list(ema_model.state_dict().values())
-        self.wd = 0.02 * args.lr
+        self.wd = 0.02 * LR
 
         for param, ema_param in zip(self.params, self.ema_params):
             param.data.copy_(ema_param.data)
