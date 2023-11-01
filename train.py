@@ -4,6 +4,7 @@ import argparse
 import os
 import shutil
 import time
+from typing import Callable
 
 import numpy as np
 import torch
@@ -16,6 +17,7 @@ import torch.utils.data as data
 import torchvision.transforms as transforms
 from progress.bar import Bar
 from tensorboardX import SummaryWriter
+from torch.utils.data import DataLoader
 
 import dataset.cifar10 as dataset
 import models.wideresnet as models
@@ -247,15 +249,15 @@ def main():
 
 
 def train(
-    labeled_trainloader,
-    unlabeled_trainloader,
-    model,
-    optimizer,
+    labeled_trainloader: DataLoader,
+    unlabeled_trainloader: DataLoader,
+    model: nn.Module,
+    optimizer: optim.Optimizer,
     ema_optimizer,
-    criterion,
-    epoch,
-    use_cuda,
-):
+    criterion: Callable,
+    epoch: int,
+    use_cuda: bool,
+) -> tuple[float, float, float]:
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -395,7 +397,14 @@ def train(
     )
 
 
-def validate(valloader, model, criterion, epoch, use_cuda, mode):
+def validate(
+    valloader: DataLoader,
+    model: nn.Module,
+    criterion: Callable,
+    epoch: int,
+    use_cuda: bool,
+    mode: str,
+):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -453,7 +462,10 @@ def validate(valloader, model, criterion, epoch, use_cuda, mode):
 
 
 def save_checkpoint(
-    state, is_best, checkpoint=args.out, filename="checkpoint.pth.tar"
+    state,
+    is_best: bool,
+    checkpoint: str = args.out,
+    filename: str = "checkpoint.pth.tar",
 ):
     filepath = os.path.join(checkpoint, filename)
     torch.save(state, filepath)
@@ -463,7 +475,7 @@ def save_checkpoint(
         )
 
 
-def linear_rampup(current, rampup_length=args.epochs):
+def linear_rampup(current: int, rampup_length: int = args.epochs):
     if rampup_length == 0:
         return 1.0
     else:
@@ -472,7 +484,14 @@ def linear_rampup(current, rampup_length=args.epochs):
 
 
 class SemiLoss(object):
-    def __call__(self, outputs_x, targets_x, outputs_u, targets_u, epoch):
+    def __call__(
+        self,
+        outputs_x: torch.Tensor,
+        targets_x: torch.Tensor,
+        outputs_u: torch.Tensor,
+        targets_u: torch.Tensor,
+        epoch: int,
+    ):
         probs_u = torch.softmax(outputs_u, dim=1)
 
         l_x = -torch.mean(
@@ -484,7 +503,12 @@ class SemiLoss(object):
 
 
 class WeightEMA(object):
-    def __init__(self, model, ema_model, alpha=0.999):
+    def __init__(
+        self,
+        model: nn.Module,
+        ema_model: nn.Module,
+        alpha: float = 0.999,
+    ):
         self.model = model
         self.ema_model = ema_model
         self.alpha = alpha
