@@ -9,13 +9,10 @@ from typing import Callable
 
 import numpy as np
 import torch
-import torch.backends.cudnn as cudnn
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.parallel
 import torch.optim as optim
-import torch.utils.data as data
-import torchvision.transforms as transforms
 from progress.bar import Bar
 from tensorboardX import SummaryWriter
 from torch.utils.data import DataLoader
@@ -66,14 +63,18 @@ parser.add_argument(
     "--gpu", default="0", type=str, help="id(s) for CUDA_VISIBLE_DEVICES"
 )
 # Method options
-parser.add_argument("--n-labeled", type=int, default=250, help="Number of labeled data")
+parser.add_argument(
+    "--n-labeled", type=int, default=250, help="Number of labeled data"
+)
 parser.add_argument(
     "--train-iteration",
     type=int,
     default=1024,
     help="Number of iteration per epoch",
 )
-parser.add_argument("--out", default="result", help="Directory to output the result")
+parser.add_argument(
+    "--out", default="result", help="Directory to output the result"
+)
 parser.add_argument("--alpha", default=0.75, type=float)
 parser.add_argument("--lambda-u", default=75, type=float)
 parser.add_argument("--T", default=0.5, type=float)
@@ -91,7 +92,15 @@ SEED = 42
 best_acc = 0  # best test accuracy
 
 
-def main():
+def main(
+    epochs: int = 1024,
+    batch_size: int = 64,
+    lr: float = 0.002,
+    n_labeled: int = 250,
+    train_iteration: int = 1024,
+    out: str = "result",
+    ema_decay: float = 0.999,
+):
     random.seed(42)
     np.random.seed(42)
 
@@ -103,8 +112,8 @@ def main():
 
     global best_acc
 
-    if not os.path.isdir(args.out):
-        mkdir_p(args.out)
+    if not os.path.isdir(out):
+        mkdir_p(out)
 
     # Data
     print(f"==> Preparing cifar10")
@@ -115,7 +124,7 @@ def main():
         val_loader,
         test_loader,
     ) = dataset.get_cifar10(
-        "./data", args.n_labeled, batch_size=args.batch_size, seed=SEED
+        "./data", n_labeled, batch_size=batch_size, seed=SEED
     )
 
     # Model
@@ -142,15 +151,15 @@ def main():
 
     train_criterion = SemiLoss()
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = optim.Adam(model.parameters(), lr=lr)
 
-    ema_optimizer = WeightEMA(model, ema_model, alpha=args.ema_decay)
+    ema_optimizer = WeightEMA(model, ema_model, alpha=ema_decay)
     start_epoch = 0
 
     # Resume
     title = "noisy-cifar-10"
 
-    logger = Logger(os.path.join(args.out, "log.txt"), title=title)
+    logger = Logger(os.path.join(out, "log.txt"), title=title)
     logger.set_names(
         [
             "Train Loss",
@@ -163,11 +172,11 @@ def main():
         ]
     )
 
-    writer = SummaryWriter(args.out)
+    writer = SummaryWriter(out)
     test_accs = []
     # Train and val
-    for epoch in range(start_epoch, args.epochs):
-        print("\nEpoch: [%d | %d] LR: %f" % (epoch + 1, args.epochs, state["lr"]))
+    for epoch in range(start_epoch, epochs):
+        print("\nEpoch: [%d | %d] LR: %f" % (epoch + 1, epochs, state["lr"]))
 
         train_loss, train_loss_x, train_loss_u = train(
             labeled_trainloader,
@@ -204,7 +213,7 @@ def main():
             mode="Test Stats ",
         )
 
-        step = args.train_iteration * (epoch + 1)
+        step = train_iteration * (epoch + 1)
 
         writer.add_scalar("losses/train_loss", train_loss, step)
         writer.add_scalar("losses/valid_loss", val_loss, step)
@@ -250,6 +259,8 @@ def main():
 
     print("Mean acc:")
     print(np.mean(test_accs[-20:]))
+
+    return best_acc, np.mean(test_accs[-20:])
 
 
 def train(
@@ -299,7 +310,9 @@ def train(
         )
 
         if use_cuda:
-            inputs_x, targets_x = inputs_x.cuda(), targets_x.cuda(non_blocking=True)
+            inputs_x, targets_x = inputs_x.cuda(), targets_x.cuda(
+                non_blocking=True
+            )
             inputs_u = inputs_u.cuda()
             inputs_u2 = inputs_u2.cuda()
 
@@ -307,7 +320,10 @@ def train(
             # compute guessed labels of unlabel samples
             outputs_u = model(inputs_u)
             outputs_u2 = model(inputs_u2)
-            p = (torch.softmax(outputs_u, dim=1) + torch.softmax(outputs_u2, dim=1)) / 2
+            p = (
+                torch.softmax(outputs_u, dim=1)
+                + torch.softmax(outputs_u2, dim=1)
+            ) / 2
             pt = p ** (1 / args.T)
             targets_u = pt / pt.sum(dim=1, keepdim=True)
             targets_u = targets_u.detach()
@@ -421,7 +437,9 @@ def validate(
             data_time.update(time.time() - end)
 
             if use_cuda:
-                inputs, targets = inputs.cuda(), targets.cuda(non_blocking=True)
+                inputs, targets = inputs.cuda(), targets.cuda(
+                    non_blocking=True
+                )
             # compute output
             outputs = model(inputs)
             loss = criterion(outputs, targets.long())
@@ -467,7 +485,9 @@ def save_checkpoint(
     filepath = os.path.join(checkpoint, filename)
     torch.save(state, filepath)
     if is_best:
-        shutil.copyfile(filepath, os.path.join(checkpoint, "model_best.pth.tar"))
+        shutil.copyfile(
+            filepath, os.path.join(checkpoint, "model_best.pth.tar")
+        )
 
 
 def linear_rampup(current: int, rampup_length: int = args.epochs):
@@ -489,7 +509,9 @@ class SemiLoss(object):
     ):
         probs_u = torch.softmax(outputs_u, dim=1)
 
-        l_x = -torch.mean(torch.sum(F.log_softmax(outputs_x, dim=1) * targets_x, dim=1))
+        l_x = -torch.mean(
+            torch.sum(F.log_softmax(outputs_x, dim=1) * targets_x, dim=1)
+        )
         l_u = torch.mean((probs_u - targets_u) ** 2)
 
         return l_x, l_u, args.lambda_u * linear_rampup(epoch)
