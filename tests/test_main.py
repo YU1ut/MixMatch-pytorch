@@ -1,4 +1,4 @@
-from train import main
+from mixmatch.train import main
 
 
 def test_main_seed():

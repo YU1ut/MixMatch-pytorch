@@ -1,6 +1,6 @@
 import numpy as np
 
-from dataset.cifar10 import get_cifar10
+from mixmatch.dataset.cifar10 import get_cifar10
 
 
 def test_load_seeded():

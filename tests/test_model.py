@@ -1,6 +1,6 @@
 import torch
 
-from models.wideresnet import WideResNet
+from mixmatch.models.wideresnet import WideResNet
 
 
 def test_model_seeded():
