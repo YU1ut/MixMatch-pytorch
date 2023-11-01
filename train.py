@@ -141,35 +141,19 @@ def main():
 
     # Resume
     title = "noisy-cifar-10"
-    if args.resume:
-        # Load checkpoint.
-        print("==> Resuming from checkpoint..")
-        assert os.path.isfile(
-            args.resume
-        ), "Error: no checkpoint directory found!"
-        args.out = os.path.dirname(args.resume)
-        checkpoint = torch.load(args.resume)
-        best_acc = checkpoint["best_acc"]
-        start_epoch = checkpoint["epoch"]
-        model.load_state_dict(checkpoint["state_dict"])
-        ema_model.load_state_dict(checkpoint["ema_state_dict"])
-        optimizer.load_state_dict(checkpoint["optimizer"])
-        logger = Logger(
-            os.path.join(args.out, "log.txt"), title=title, resume=True
-        )
-    else:
-        logger = Logger(os.path.join(args.out, "log.txt"), title=title)
-        logger.set_names(
-            [
-                "Train Loss",
-                "Train Loss X",
-                "Train Loss U",
-                "Valid Loss",
-                "Valid Acc.",
-                "Test Loss",
-                "Test Acc.",
-            ]
-        )
+
+    logger = Logger(os.path.join(args.out, "log.txt"), title=title)
+    logger.set_names(
+        [
+            "Train Loss",
+            "Train Loss X",
+            "Train Loss U",
+            "Valid Loss",
+            "Valid Acc.",
+            "Test Loss",
+            "Test Acc.",
+        ]
+    )
 
     writer = SummaryWriter(args.out)
     test_accs = []
