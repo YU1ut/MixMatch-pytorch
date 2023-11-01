@@ -3,6 +3,7 @@ from PIL import Image
 
 import torchvision
 import torch
+from torch.utils.data import DataLoader
 
 
 class TransformTwice:
@@ -16,7 +17,7 @@ class TransformTwice:
 
 
 def get_cifar10(
-    root, n_labeled, transform_train=None, transform_val=None, download=True
+    root, n_labeled, batch_size, transform_train=None, transform_val=None, download=True,
 ):
     base_dataset = torchvision.datasets.CIFAR10(
         root, train=True, download=download
@@ -44,11 +45,32 @@ def get_cifar10(
     print(
         f"#Labeled: {len(train_labeled_idxs)} #Unlabeled: {len(train_unlabeled_idxs)} #Val: {len(val_idxs)}"
     )
-    return (
+
+    labeled_trainloader = DataLoader(
         train_labeled_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=0,
+        drop_last=True,
+    )
+    unlabeled_trainloader = DataLoader(
         train_unlabeled_dataset,
-        val_dataset,
-        test_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=0,
+        drop_last=True,
+    )
+    val_loader = DataLoader(
+        val_dataset, batch_size=batch_size, shuffle=False, num_workers=0
+    )
+    test_loader = DataLoader(
+        test_dataset, batch_size=batch_size, shuffle=False, num_workers=0
+    )
+    return (
+        labeled_trainloader,
+        unlabeled_trainloader,
+        val_loader,
+        test_loader,
     )
 
 
