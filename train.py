@@ -2,6 +2,7 @@ from __future__ import print_function
 
 import argparse
 import os
+import random
 import shutil
 import time
 from typing import Callable
@@ -65,18 +66,14 @@ parser.add_argument(
     "--gpu", default="0", type=str, help="id(s) for CUDA_VISIBLE_DEVICES"
 )
 # Method options
-parser.add_argument(
-    "--n-labeled", type=int, default=250, help="Number of labeled data"
-)
+parser.add_argument("--n-labeled", type=int, default=250, help="Number of labeled data")
 parser.add_argument(
     "--train-iteration",
     type=int,
     default=1024,
     help="Number of iteration per epoch",
 )
-parser.add_argument(
-    "--out", default="result", help="Directory to output the result"
-)
+parser.add_argument("--out", default="result", help="Directory to output the result")
 parser.add_argument("--alpha", default=0.75, type=float)
 parser.add_argument("--lambda-u", default=75, type=float)
 parser.add_argument("--T", default=0.5, type=float)
@@ -95,6 +92,15 @@ best_acc = 0  # best test accuracy
 
 
 def main():
+    random.seed(42)
+    np.random.seed(42)
+
+    torch.manual_seed(42)
+    torch.cuda.manual_seed_all(42)
+
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
     global best_acc
 
     if not os.path.isdir(args.out):
@@ -128,7 +134,7 @@ def main():
     model = create_model()
     ema_model = create_model(ema=True)
 
-    cudnn.benchmark = True
+    # cudnn.benchmark = True
     print(
         "    Total params: %.2fM"
         % (sum(p.numel() for p in model.parameters()) / 1000000.0)
@@ -161,9 +167,7 @@ def main():
     test_accs = []
     # Train and val
     for epoch in range(start_epoch, args.epochs):
-        print(
-            "\nEpoch: [%d | %d] LR: %f" % (epoch + 1, args.epochs, state["lr"])
-        )
+        print("\nEpoch: [%d | %d] LR: %f" % (epoch + 1, args.epochs, state["lr"]))
 
         train_loss, train_loss_x, train_loss_u = train(
             labeled_trainloader,
@@ -295,9 +299,7 @@ def train(
         )
 
         if use_cuda:
-            inputs_x, targets_x = inputs_x.cuda(), targets_x.cuda(
-                non_blocking=True
-            )
+            inputs_x, targets_x = inputs_x.cuda(), targets_x.cuda(non_blocking=True)
             inputs_u = inputs_u.cuda()
             inputs_u2 = inputs_u2.cuda()
 
@@ -305,10 +307,7 @@ def train(
             # compute guessed labels of unlabel samples
             outputs_u = model(inputs_u)
             outputs_u2 = model(inputs_u2)
-            p = (
-                torch.softmax(outputs_u, dim=1)
-                + torch.softmax(outputs_u2, dim=1)
-            ) / 2
+            p = (torch.softmax(outputs_u, dim=1) + torch.softmax(outputs_u2, dim=1)) / 2
             pt = p ** (1 / args.T)
             targets_u = pt / pt.sum(dim=1, keepdim=True)
             targets_u = targets_u.detach()
@@ -422,9 +421,7 @@ def validate(
             data_time.update(time.time() - end)
 
             if use_cuda:
-                inputs, targets = inputs.cuda(), targets.cuda(
-                    non_blocking=True
-                )
+                inputs, targets = inputs.cuda(), targets.cuda(non_blocking=True)
             # compute output
             outputs = model(inputs)
             loss = criterion(outputs, targets.long())
@@ -470,9 +467,7 @@ def save_checkpoint(
     filepath = os.path.join(checkpoint, filename)
     torch.save(state, filepath)
     if is_best:
-        shutil.copyfile(
-            filepath, os.path.join(checkpoint, "model_best.pth.tar")
-        )
+        shutil.copyfile(filepath, os.path.join(checkpoint, "model_best.pth.tar"))
 
 
 def linear_rampup(current: int, rampup_length: int = args.epochs):
@@ -494,9 +489,7 @@ class SemiLoss(object):
     ):
         probs_u = torch.softmax(outputs_u, dim=1)
 
-        l_x = -torch.mean(
-            torch.sum(F.log_softmax(outputs_x, dim=1) * targets_x, dim=1)
-        )
+        l_x = -torch.mean(torch.sum(F.log_softmax(outputs_x, dim=1) * targets_x, dim=1))
         l_u = torch.mean((probs_u - targets_u) ** 2)
 
         return l_x, l_u, args.lambda_u * linear_rampup(epoch)
