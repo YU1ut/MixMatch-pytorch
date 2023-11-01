@@ -1,41 +1,40 @@
-'''Some helper functions for PyTorch, including:
+"""Some helper functions for PyTorch, including:
     - get_mean_and_std: calculate the mean and std value of dataset.
     - msr_init: net parameter initialization.
     - progress_bar: progress bar mimic xlua.progress.
-'''
+"""
 import errno
 import os
-import sys
-import time
-import math
 
 import torch.nn as nn
 import torch.nn.init as init
-from torch.autograd import Variable
 
-__all__ = ['get_mean_and_std', 'init_params', 'mkdir_p', 'AverageMeter']
+__all__ = ["get_mean_and_std", "init_params", "mkdir_p", "AverageMeter"]
 
 
 def get_mean_and_std(dataset):
-    '''Compute the mean and std value of dataset.'''
-    dataloader = trainloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=True, num_workers=2)
+    """Compute the mean and std value of dataset."""
+    dataloader = trainloader = torch.utils.data.DataLoader(
+        dataset, batch_size=1, shuffle=True, num_workers=2
+    )
 
     mean = torch.zeros(3)
     std = torch.zeros(3)
-    print('==> Computing mean and std..')
+    print("==> Computing mean and std..")
     for inputs, targets in dataloader:
         for i in range(3):
-            mean[i] += inputs[:,i,:,:].mean()
-            std[i] += inputs[:,i,:,:].std()
+            mean[i] += inputs[:, i, :, :].mean()
+            std[i] += inputs[:, i, :, :].std()
     mean.div_(len(dataset))
     std.div_(len(dataset))
     return mean, std
 
+
 def init_params(net):
-    '''Init layer parameters.'''
+    """Init layer parameters."""
     for m in net.modules():
         if isinstance(m, nn.Conv2d):
-            init.kaiming_normal(m.weight, mode='fan_out')
+            init.kaiming_normal(m.weight, mode="fan_out")
             if m.bias:
                 init.constant(m.bias, 0)
         elif isinstance(m, nn.BatchNorm2d):
@@ -46,8 +45,9 @@ def init_params(net):
             if m.bias:
                 init.constant(m.bias, 0)
 
+
 def mkdir_p(path):
-    '''make dir if not exist'''
+    """make dir if not exist"""
     try:
         os.makedirs(path)
     except OSError as exc:  # Python >2.5
@@ -56,10 +56,12 @@ def mkdir_p(path):
         else:
             raise
 
+
 class AverageMeter(object):
     """Computes and stores the average and current value
-       Imported from https://github.com/pytorch/examples/blob/master/imagenet/main.py#L247-L262
+    Imported from https://github.com/pytorch/examples/blob/master/imagenet/main.py#L247-L262
     """
+
     def __init__(self):
         self.reset()
 
