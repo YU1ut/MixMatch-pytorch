@@ -82,7 +82,6 @@ def train(
 
         batch_size = x_lbl.size(0)
 
-        # Transform label to one-hot
         y_lbl = one_hot(y_lbl.long(), num_classes=10)
 
         x_lbl = x_lbl.to(device)
@@ -100,7 +99,7 @@ def train(
         y = torch.cat([y_lbl, y_unl, y_unl], dim=0)
         x_mix, y_mix = mix_up(x, y, mix_beta_alpha)
 
-        # interleave labeled and unlabed samples between batches to
+        # interleave labeled and unlabeled samples between batches to
         # get correct batchnorm calculation
         x_mix = list(torch.split(x_mix, batch_size))
         x_mix = interleave(x_mix, batch_size)
@@ -128,13 +127,11 @@ def train(
 
         loss = loss_lbl + loss_unl_scale * loss_unl
 
-        # record loss
         losses.append(loss)
         losses_x.append(loss_lbl)
         losses_u.append(loss_unl)
         n.append(x_lbl.size(0))
 
-        # compute gradient and do SGD step
         optim.zero_grad()
         loss.backward()
         optim.step()
@@ -167,7 +164,6 @@ def validate(
             y_pred = model(x)
             loss = loss_fn(y_pred, y.long())
 
-            # measure accuracy and record loss
             # TODO: Technically, we shouldn't * 100, but it's fine for now as
             #  it doesn't impact training
             acc = (
