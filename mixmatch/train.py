@@ -151,7 +151,7 @@ def train(
     ema_optimizer,
     criterion: SemiLoss,
     epoch: int,
-    use_cuda: bool,
+    device: str,
     train_iteration: int,
     lambda_u: float,
     alpha: float,
@@ -187,12 +187,10 @@ def train(
             1, targets_x.view(-1, 1).long(), 1
         )
 
-        if use_cuda:
-            inputs_x, targets_x = inputs_x.cuda(), targets_x.cuda(
-                non_blocking=True
-            )
-            inputs_u = inputs_u.cuda()
-            inputs_u2 = inputs_u2.cuda()
+        inputs_x = inputs_x.to(device)
+        targets_x = targets_x.to(device)
+        inputs_u = inputs_u.to(device)
+        inputs_u2 = inputs_u2.to(device)
 
         with torch.no_grad():
             # compute guessed labels of unlabel samples
