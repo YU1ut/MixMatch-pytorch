@@ -1,5 +1,6 @@
 import os
 import random
+from copy import deepcopy
 
 import numpy as np
 import torch
@@ -22,16 +23,17 @@ best_acc = 0  # best test accuracy
 
 
 def main(
-        epochs: int = 1024,
-        batch_size: int = 64,
-        lr: float = 0.002,
-        n_labeled: int = 250,
-        train_iteration: int = 1024,
-        out: str = "result",
-        ema_decay: float = 0.999,
-        lambda_u: float = 75,
-        alpha: float = 0.75,
-        t: float = 0.5,
+    epochs: int = 1024,
+    batch_size: int = 64,
+    lr: float = 0.002,
+    n_labeled: int = 250,
+    train_iteration: int = 1024,
+    out: str = "result",
+    ema_decay: float = 0.999,
+    lambda_u: float = 75,
+    alpha: float = 0.75,
+    t: float = 0.5,
+    device: str = "cuda",
 ):
     random.seed(42)
     np.random.seed(42)
@@ -62,18 +64,10 @@ def main(
     # Model
     print("==> creating WRN-28-2")
 
-    def create_model(ema=False):
-        model_ = models.WideResNet(num_classes=10)
-        model_ = model_.cuda()
-
-        if ema:
-            for param in model_.parameters():
-                param.detach_()
-
-        return model_
-
-    model = create_model()
-    ema_model = create_model(ema=True)
+    model = models.WideResNet(num_classes=10).to(device)
+    ema_model = deepcopy(model).to(device)
+    for param in ema_model.parameters():
+        param.detach_()
 
     # cudnn.benchmark = True
     print(
