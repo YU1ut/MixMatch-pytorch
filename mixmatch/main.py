@@ -9,9 +9,8 @@ import torch.optim as optim
 
 import mixmatch.dataset.cifar10 as dataset
 import mixmatch.models.wideresnet as models
-from train import SemiLoss, WeightEMA, validate, save_checkpoint, train
+from train import SemiLoss, WeightEMA, validate, train
 from utils import mkdir_p
-
 
 # Use CUDA
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
@@ -130,21 +129,6 @@ def main(
             mode="Test Stats ",
         )
 
-        # save model
-        is_best = val_acc > best_acc
-        best_acc = max(val_acc, best_acc)
-        save_checkpoint(
-            {
-                "epoch": epoch + 1,
-                "state_dict": model.state_dict(),
-                "ema_state_dict": ema_model.state_dict(),
-                "acc": val_acc,
-                "best_acc": best_acc,
-                "optimizer": optimizer.state_dict(),
-            },
-            is_best,
-            checkpoint=out,
-        )
         test_accs.append(test_acc)
 
         print(
