@@ -17,6 +17,7 @@ from utils.loss import SemiLoss
 
 
 def main(
+    *,
     epochs: int = 1024,
     batch_size: int = 64,
     lr: float = 0.002,
