@@ -1,21 +1,17 @@
+from __future__ import annotations
 from pathlib import Path
 from typing import Callable, Sequence, List
 
 import numpy as np
-from sklearn.model_selection import train_test_split, StratifiedShuffleSplit
-from torch.utils.data import DataLoader, Subset, Dataset
-from torch.utils.data.dataset import T_co
-from torchvision.datasets import CIFAR10
-
 import torch
+from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader, Subset, Dataset
 from torchvision import transforms
+from torchvision.datasets import CIFAR10
 from torchvision.transforms.v2 import (
     RandomHorizontalFlip,
-    RandomVerticalFlip,
     RandomCrop,
 )
-
-# from torchvision.transforms.v2 import AutoAugmentPolicy, AutoAugment
 
 tf_preproc = transforms.Compose(
     [
@@ -23,7 +19,6 @@ tf_preproc = transforms.Compose(
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261)),
     ]
 )
-
 
 tf_aug = transforms.Compose(
     [
@@ -43,23 +38,54 @@ tf_aug = transforms.Compose(
 )
 
 
-class SubsetKAugments(Subset):
+class CIFAR10Subset(CIFAR10):
     def __init__(
         self,
-        dataset: Dataset,
-        indices: Sequence[int],
-        augment: Callable,
-        k: int,
+        root: str,
+        idxs: Sequence[int] | None = None,
+        train: bool = True,
+        transform: Callable | None = None,
+        target_transform: Callable | None = None,
+        download: bool = False,
     ):
-        super().__init__(dataset, indices)
-        self.augment = augment
-        self.k = k
+        super().__init__(
+            root,
+            train=train,
+            transform=transform,
+            target_transform=target_transform,
+            download=download,
+        )
+        if idxs is not None:
+            self.data = self.data[idxs]
+            self.targets = np.array(self.targets)[idxs].tolist()
 
-    def __getitems__(self, indices: List[int]) -> List:
-        xs: list[tuple[torch.Tensor, int]] = super().__getitems__(indices)
-        # [(x1, y1), (x2, y2), ...]
-        xs_aug = [(tuple(tf_aug(x) for _ in range(self.k)), y) for x, y in xs]
-        return xs_aug
+
+class CIFAR10SubsetKAug(CIFAR10Subset):
+    def __init__(
+        self,
+        root: str,
+        k_augs: int,
+        aug: Callable,
+        idxs: Sequence[int] | None = None,
+        train: bool = True,
+        transform: Callable | None = None,
+        target_transform: Callable | None = None,
+        download: bool = False,
+    ):
+        super().__init__(
+            root=root,
+            idxs=idxs,
+            train=train,
+            transform=transform,
+            target_transform=target_transform,
+            download=download,
+        )
+        self.k_augs = k_augs
+        self.aug = aug
+
+    def __getitem__(self, item):
+        img, target = super().__getitem__(item)
+        return tuple(self.aug(img) for _ in range(self.k_augs)), target
 
 
 def get_dataloaders(
@@ -122,25 +148,43 @@ def get_dataloaders(
         stratify=lbl_targets,
     )
 
-    train_lbl_ds = Subset(src_train_ds, train_lbl_ixs)
-    train_unl_ds = SubsetKAugments(
-        src_train_ds, train_unl_ixs, augment=tf_aug, k=2
+    train_lbl_ds = CIFAR10SubsetKAug(
+        dataset_dir,
+        idxs=train_lbl_ixs,
+        train=True,
+        transform=tf_preproc,
+        download=True,
+        k_augs=1,
+        aug=tf_aug,
     )
-    val_ds = Subset(src_train_ds, val_ixs)
+    train_unl_ds = CIFAR10SubsetKAug(
+        dataset_dir,
+        idxs=train_unl_ixs,
+        train=True,
+        transform=tf_preproc,
+        download=True,
+        k_augs=2,
+        aug=tf_aug,
+    )
+    val_ds = CIFAR10Subset(
+        dataset_dir,
+        idxs=val_ixs,
+        train=True,
+        transform=tf_preproc,
+        download=True,
+    )
 
     dl_args = dict(
         batch_size=batch_size,
         num_workers=num_workers,
-        pin_memory=True,
-        drop_last=True,
     )
 
-    # We use drop_last=True to ensure that the batch size is always the same
-    # This is crucial as we need to average the predictions across the batch
-    # size axis.
-
-    train_lbl_dl = DataLoader(train_lbl_ds, shuffle=True, **dl_args)
-    train_unl_dl = DataLoader(train_unl_ds, shuffle=True, **dl_args)
+    train_lbl_dl = DataLoader(
+        train_lbl_ds, shuffle=True, drop_last=True, **dl_args
+    )
+    train_unl_dl = DataLoader(
+        train_unl_ds, shuffle=True, drop_last=True, **dl_args
+    )
     val_dl = DataLoader(val_ds, shuffle=False, **dl_args)
     test_dl = DataLoader(src_test_ds, shuffle=False, **dl_args)
 
