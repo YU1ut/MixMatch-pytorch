@@ -32,6 +32,7 @@ def main(
     ema_decay: float = 0.999,
     lambda_u: float = 75,
     alpha: float = 0.75,
+    t: float = 0.5,
 ):
     random.seed(42)
     np.random.seed(42)
@@ -85,7 +86,7 @@ def main(
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
-    ema_optimizer = WeightEMA(model, ema_model, alpha=ema_decay)
+    ema_optimizer = WeightEMA(model, ema_model, alpha=ema_decay, lr=lr)
     start_epoch = 0
 
     test_accs = []
@@ -106,6 +107,7 @@ def main(
             lambda_u=lambda_u,
             alpha=alpha,
             epochs=epochs,
+            t=t,
         )
         _, train_acc = validate(
             valloader=labeled_trainloader,

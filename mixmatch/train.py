@@ -175,6 +175,7 @@ class WeightEMA(object):
         model: nn.Module,
         ema_model: nn.Module,
         alpha: float = 0.999,
+        lr: float = 0.002,
     ):
         self.model = model
         self.ema_model = ema_model
@@ -230,6 +231,7 @@ def train(
     lambda_u: float,
     alpha: float,
     epochs: int,
+    t: float,
 ) -> tuple[float, float, float]:
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -282,7 +284,7 @@ def train(
                 torch.softmax(outputs_u, dim=1)
                 + torch.softmax(outputs_u2, dim=1)
             ) / 2
-            pt = p ** (1 / T)
+            pt = p ** (1 / t)
             targets_u = pt / pt.sum(dim=1, keepdim=True)
             targets_u = targets_u.detach()
 
