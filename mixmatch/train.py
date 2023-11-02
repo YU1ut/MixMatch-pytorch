@@ -1,5 +1,4 @@
 import os
-import random
 import shutil
 import time
 from typing import Callable
@@ -11,12 +10,9 @@ import torch.nn.functional as F
 import torch.nn.parallel
 import torch.optim as optim
 from progress.bar import Bar
-from tensorboardX import SummaryWriter
 from torch.utils.data import DataLoader
 
-import mixmatch.dataset.cifar10 as dataset
-import mixmatch.models.wideresnet as models
-from utils import mkdir_p, AverageMeter, accuracy, Logger
+from utils import AverageMeter, accuracy
 
 EPOCHS: int = 1024
 START_EPOCH: int = 0
@@ -57,177 +53,6 @@ use_cuda = torch.cuda.is_available()
 SEED = 42
 
 best_acc = 0  # best test accuracy
-
-
-def main(
-    epochs: int = 1024,
-    batch_size: int = 64,
-    lr: float = 0.002,
-    n_labeled: int = 250,
-    train_iteration: int = 1024,
-    out: str = "result",
-    ema_decay: float = 0.999,
-):
-    random.seed(42)
-    np.random.seed(42)
-
-    torch.manual_seed(42)
-    torch.cuda.manual_seed_all(42)
-
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-
-    global best_acc
-
-    if not os.path.isdir(out):
-        mkdir_p(out)
-
-    # Data
-    print(f"==> Preparing cifar10")
-
-    (
-        labeled_trainloader,
-        unlabeled_trainloader,
-        val_loader,
-        test_loader,
-    ) = dataset.get_cifar10(
-        "./data", n_labeled, batch_size=batch_size, seed=SEED
-    )
-
-    # Model
-    print("==> creating WRN-28-2")
-
-    def create_model(ema=False):
-        model_ = models.WideResNet(num_classes=10)
-        model_ = model_.cuda()
-
-        if ema:
-            for param in model_.parameters():
-                param.detach_()
-
-        return model_
-
-    model = create_model()
-    ema_model = create_model(ema=True)
-
-    # cudnn.benchmark = True
-    print(
-        "    Total params: %.2fM"
-        % (sum(p.numel() for p in model.parameters()) / 1000000.0)
-    )
-
-    train_criterion = SemiLoss()
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=lr)
-
-    ema_optimizer = WeightEMA(model, ema_model, alpha=ema_decay)
-    start_epoch = 0
-
-    # Resume
-    title = "noisy-cifar-10"
-
-    logger = Logger(os.path.join(out, "log.txt"), title=title)
-    logger.set_names(
-        [
-            "Train Loss",
-            "Train Loss X",
-            "Train Loss U",
-            "Valid Loss",
-            "Valid Acc.",
-            "Test Loss",
-            "Test Acc.",
-        ]
-    )
-
-    writer = SummaryWriter(out)
-    test_accs = []
-    # Train and val
-    for epoch in range(start_epoch, epochs):
-        print("\nEpoch: [%d | %d] LR: %f" % (epoch + 1, epochs, state["lr"]))
-
-        train_loss, train_loss_x, train_loss_u = train(
-            labeled_trainloader,
-            unlabeled_trainloader,
-            model,
-            optimizer,
-            ema_optimizer,
-            train_criterion,
-            epoch,
-            use_cuda,
-        )
-        _, train_acc = validate(
-            labeled_trainloader,
-            ema_model,
-            criterion,
-            epoch,
-            use_cuda,
-            mode="Train Stats",
-        )
-        val_loss, val_acc = validate(
-            val_loader,
-            ema_model,
-            criterion,
-            epoch,
-            use_cuda,
-            mode="Valid Stats",
-        )
-        test_loss, test_acc = validate(
-            test_loader,
-            ema_model,
-            criterion,
-            epoch,
-            use_cuda,
-            mode="Test Stats ",
-        )
-
-        step = train_iteration * (epoch + 1)
-
-        writer.add_scalar("losses/train_loss", train_loss, step)
-        writer.add_scalar("losses/valid_loss", val_loss, step)
-        writer.add_scalar("losses/test_loss", test_loss, step)
-
-        writer.add_scalar("accuracy/train_acc", train_acc, step)
-        writer.add_scalar("accuracy/val_acc", val_acc, step)
-        writer.add_scalar("accuracy/test_acc", test_acc, step)
-
-        # append logger file
-        logger.append(
-            [
-                train_loss,
-                train_loss_x,
-                train_loss_u,
-                val_loss,
-                val_acc,
-                test_loss,
-                test_acc,
-            ]
-        )
-
-        # save model
-        is_best = val_acc > best_acc
-        best_acc = max(val_acc, best_acc)
-        save_checkpoint(
-            {
-                "epoch": epoch + 1,
-                "state_dict": model.state_dict(),
-                "ema_state_dict": ema_model.state_dict(),
-                "acc": val_acc,
-                "best_acc": best_acc,
-                "optimizer": optimizer.state_dict(),
-            },
-            is_best,
-        )
-        test_accs.append(test_acc)
-    logger.close()
-    writer.close()
-
-    print("Best acc:")
-    print(best_acc)
-
-    print("Mean acc:")
-    print(np.mean(test_accs[-20:]))
-
-    return best_acc, np.mean(test_accs[-20:])
 
 
 def train(
@@ -277,9 +102,7 @@ def train(
         )
 
         if use_cuda:
-            inputs_x, targets_x = inputs_x.cuda(), targets_x.cuda(
-                non_blocking=True
-            )
+            inputs_x, targets_x = inputs_x.cuda(), targets_x.cuda(non_blocking=True)
             inputs_u = inputs_u.cuda()
             inputs_u2 = inputs_u2.cuda()
 
@@ -287,10 +110,7 @@ def train(
             # compute guessed labels of unlabel samples
             outputs_u = model(inputs_u)
             outputs_u2 = model(inputs_u2)
-            p = (
-                torch.softmax(outputs_u, dim=1)
-                + torch.softmax(outputs_u2, dim=1)
-            ) / 2
+            p = (torch.softmax(outputs_u, dim=1) + torch.softmax(outputs_u2, dim=1)) / 2
             pt = p ** (1 / T)
             targets_u = pt / pt.sum(dim=1, keepdim=True)
             targets_u = targets_u.detach()
@@ -404,9 +224,7 @@ def validate(
             data_time.update(time.time() - end)
 
             if use_cuda:
-                inputs, targets = inputs.cuda(), targets.cuda(
-                    non_blocking=True
-                )
+                inputs, targets = inputs.cuda(), targets.cuda(non_blocking=True)
             # compute output
             outputs = model(inputs)
             loss = criterion(outputs, targets.long())
@@ -452,9 +270,7 @@ def save_checkpoint(
     filepath = os.path.join(checkpoint, filename)
     torch.save(state, filepath)
     if is_best:
-        shutil.copyfile(
-            filepath, os.path.join(checkpoint, "model_best.pth.tar")
-        )
+        shutil.copyfile(filepath, os.path.join(checkpoint, "model_best.pth.tar"))
 
 
 def linear_rampup(current: int, rampup_length: int = EPOCHS):
@@ -476,9 +292,7 @@ class SemiLoss(object):
     ):
         probs_u = torch.softmax(outputs_u, dim=1)
 
-        l_x = -torch.mean(
-            torch.sum(F.log_softmax(outputs_x, dim=1) * targets_x, dim=1)
-        )
+        l_x = -torch.mean(torch.sum(F.log_softmax(outputs_x, dim=1) * targets_x, dim=1))
         l_u = torch.mean((probs_u - targets_u) ** 2)
 
         return l_x, l_u, LAMBDA_U * linear_rampup(epoch)
