@@ -5,7 +5,8 @@ import torch
 import torch.nn as nn
 import torch.nn.parallel
 import torch.optim as optim
-from torch.nn import CrossEntropyLoss, MSELoss
+from torch.nn import CrossEntropyLoss
+from torch.nn.functional import mse_loss, cross_entropy
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -66,9 +67,11 @@ class SemiLoss(object):
     ):
         probs_u = torch.softmax(outputs_u, dim=1)
 
-        l_x = CrossEntropyLoss()(outputs_x, targets_x)
-        l_u = MSELoss()(probs_u, targets_u)
-
+        l_x = cross_entropy(outputs_x, targets_x)
+        # TODO: Not sure why this is different from MSELoss
+        #  It's likely not a big deal, but it's worth investigating if we have
+        #  too much time on our hands
+        l_u = torch.mean((probs_u - targets_u) ** 2)
         return (
             l_x,
             l_u,
