@@ -173,7 +173,6 @@ def train(
         inputs_x = inputs_x.to(device)
         targets_x = targets_x.to(device)
         inputs_u = [u.to(device) for u in inputs_u]
-        # inputs_u2 = inputs_u2.to(device)
 
         with torch.no_grad():
             # compute guessed labels of unlabel samples
@@ -193,11 +192,8 @@ def train(
 
         idx = torch.randperm(all_inputs.size(0))
 
-        input_a, input_b = all_inputs, all_inputs[idx]
-        target_a, target_b = all_targets, all_targets[idx]
-
-        mixed_input = ratio * input_a + (1 - ratio) * input_b
-        mixed_target = ratio * target_a + (1 - ratio) * target_b
+        mixed_input = ratio * all_inputs + (1 - ratio) * all_inputs[idx]
+        mixed_target = ratio * all_targets + (1 - ratio) * all_targets[idx]
 
         # interleave labeled and unlabed samples between batches to
         # get correct batchnorm calculation
