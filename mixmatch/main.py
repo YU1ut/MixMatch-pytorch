@@ -12,40 +12,9 @@ import mixmatch.models.wideresnet as models
 from train import SemiLoss, WeightEMA, validate, save_checkpoint, train
 from utils import mkdir_p
 
-EPOCHS: int = 1024
-START_EPOCH: int = 0
-MANUAL_SEED: int = 0
-RESUME: str = ""
-GPU: str = "0"
-OUT: str = "result"
-BATCH_SIZE: int = 64
-LR: float = 0.002
-N_LABELED: int = 250
-TRAIN_ITERATION: int = 1024
-EMA_DECAY: float = 0.999
-ALPHA: float = 0.75
-LAMBDA_U: float = 75
-T: float = 0.5
-
-state = {
-    "epochs": EPOCHS,
-    "start_epoch": START_EPOCH,
-    "manual_seed": MANUAL_SEED,
-    "resume": RESUME,
-    "gpu": GPU,
-    "out": OUT,
-    "batch_size": BATCH_SIZE,
-    "lr": LR,
-    "n_labeled": N_LABELED,
-    "train_iteration": TRAIN_ITERATION,
-    "ema_decay": EMA_DECAY,
-    "alpha": ALPHA,
-    "lambda_u": LAMBDA_U,
-    "T": T,
-}
 
 # Use CUDA
-os.environ["CUDA_VISIBLE_DEVICES"] = GPU
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 use_cuda = torch.cuda.is_available()
 
 SEED = 42
@@ -122,7 +91,7 @@ def main(
     test_accs = []
     # Train and val
     for epoch in range(start_epoch, epochs):
-        print("\nEpoch: [%d | %d] LR: %f" % (epoch + 1, epochs, state["lr"]))
+        print("\nEpoch: [%d | %d] LR: %f" % (epoch + 1, epochs, lr))
 
         train_loss, train_loss_x, train_loss_u = train(
             labeled_trainloader=labeled_trainloader,
