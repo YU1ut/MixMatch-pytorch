@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.parallel
 import torch.optim as optim
 from torch.nn import CrossEntropyLoss
-from torch.nn.functional import mse_loss, cross_entropy
+from torch.nn.functional import mse_loss, cross_entropy, one_hot
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -168,9 +168,7 @@ def train(
         batch_size = inputs_x.size(0)
 
         # Transform label to one-hot
-        targets_x = torch.zeros(batch_size, 10).scatter_(
-            1, targets_x.view(-1, 1).long(), 1
-        )
+        targets_x = one_hot(targets_x.long(), num_classes=10)
 
         inputs_x = inputs_x.to(device)
         targets_x = targets_x.to(device)
