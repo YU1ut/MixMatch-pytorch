@@ -10,8 +10,9 @@ from torch.utils.data import DataLoader
 from torchmetrics.functional import accuracy
 from tqdm import tqdm
 
-from train import WeightEMA, SemiLoss
+from utils.ema import WeightEMA
 from utils.interleave import interleave
+from utils.loss import SemiLoss
 
 
 def train(
