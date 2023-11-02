@@ -15,6 +15,21 @@ from utils.interleave import interleave
 from utils.loss import SemiLoss
 
 
+def mix_up(
+    x: nn.Module,
+    y: nn.Module,
+    alpha: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    ratio = np.random.beta(alpha, alpha)
+    ratio = max(ratio, 1 - ratio)
+
+    shuf_idx = torch.randperm(x.size(0))
+
+    x_mix = ratio * x + (1 - ratio) * x[shuf_idx]
+    y_mix = ratio * y + (1 - ratio) * y[shuf_idx]
+    return x_mix, y_mix
+
+
 def guess_labels(
     model: nn.Module,
     x_unls: list[torch.Tensor],
@@ -81,17 +96,9 @@ def train(
                 sharpen_temp=sharpen_temp,
             )
 
-        # mixup
         x = torch.cat([x_lbl, *x_unls], dim=0)
         y = torch.cat([y_lbl, y_unl, y_unl], dim=0)
-
-        ratio = np.random.beta(mix_beta_alpha, mix_beta_alpha)
-        ratio = max(ratio, 1 - ratio)
-
-        shuf_idx = torch.randperm(x.size(0))
-
-        x_mix = ratio * x + (1 - ratio) * x[shuf_idx]
-        y_mix = ratio * y + (1 - ratio) * y[shuf_idx]
+        x_mix, y_mix = mix_up(x, y, mix_beta_alpha)
 
         # interleave labeled and unlabed samples between batches to
         # get correct batchnorm calculation
@@ -102,6 +109,7 @@ def train(
 
         # put interleaved samples back
         y_mix_pred = interleave(y_mix_pred, batch_size)
+
         y_mix_lbl_pred = y_mix_pred[0]
         y_mix_lbl = y_mix[:batch_size]
         y_mix_unl_pred = torch.cat(y_mix_pred[1:], dim=0)
@@ -155,7 +163,7 @@ def validate(
         for x, y in tqdm(valloader):
             x = x.to(device)
             y = y.to(device)
-            # compute output
+
             y_pred = model(x)
             loss = loss_fn(y_pred, y.long())
 
