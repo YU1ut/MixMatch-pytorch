@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Sequence
 
 import numpy as np
 import torch
@@ -158,6 +158,10 @@ def validate(
     model.eval()
     with torch.no_grad():
         for x, y in tqdm(valloader):
+            # TODO: Pretty hacky but this is for the train loader.
+            if isinstance(x, Sequence):
+                x = x[0]
+
             x = x.to(device)
             y = y.to(device)
 
