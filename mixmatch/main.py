@@ -22,16 +22,16 @@ best_acc = 0  # best test accuracy
 
 
 def main(
-    epochs: int = 1024,
-    batch_size: int = 64,
-    lr: float = 0.002,
-    n_labeled: int = 250,
-    train_iteration: int = 1024,
-    out: str = "result",
-    ema_decay: float = 0.999,
-    lambda_u: float = 75,
-    alpha: float = 0.75,
-    t: float = 0.5,
+        epochs: int = 1024,
+        batch_size: int = 64,
+        lr: float = 0.002,
+        n_labeled: int = 250,
+        train_iteration: int = 1024,
+        out: str = "result",
+        ema_decay: float = 0.999,
+        lambda_u: float = 75,
+        alpha: float = 0.75,
+        t: float = 0.5,
 ):
     random.seed(42)
     np.random.seed(42)
@@ -129,6 +129,7 @@ def main(
             mode="Test Stats ",
         )
 
+        best_acc = max(val_acc, best_acc)
         test_accs.append(test_acc)
 
         print(
