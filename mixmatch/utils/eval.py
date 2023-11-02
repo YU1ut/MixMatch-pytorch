@@ -1,11 +1,11 @@
-from typing import Callable
+from typing import Callable, Sequence
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.parallel
-import torch.optim as optim
 from torch.nn.functional import one_hot
+from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 from torchmetrics.functional import accuracy
 from tqdm import tqdm
@@ -16,8 +16,8 @@ from utils.loss import SemiLoss
 
 
 def mix_up(
-    x: nn.Module,
-    y: nn.Module,
+    x: torch.Tensor,
+    y: torch.Tensor,
     alpha: float,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     ratio = np.random.beta(alpha, alpha)
@@ -47,7 +47,7 @@ def train(
     train_lbl_dl: DataLoader,
     train_unl_dl: DataLoader,
     model: nn.Module,
-    optim: optim.Optimizer,
+    optim: Optimizer,
     ema_optim: WeightEMA,
     loss_fn: SemiLoss,
     epoch: int,
@@ -69,10 +69,10 @@ def train(
     model.train()
     for batch_idx in tqdm(range(train_iters)):
         try:
-            x_lbl, y_lbl = next(lbl_iter)
+            (x_lbl,), y_lbl = next(lbl_iter)
         except StopIteration:
             lbl_iter = iter(train_lbl_dl)
-            x_lbl, y_lbl = next(lbl_iter)
+            (x_lbl,), y_lbl = next(lbl_iter)
 
         try:
             x_unls, _ = next(unl_iter)
@@ -158,6 +158,10 @@ def validate(
     model.eval()
     with torch.no_grad():
         for x, y in tqdm(valloader):
+            # TODO: Pretty hacky but this is for the train loader.
+            if isinstance(x, Sequence):
+                x = x[0]
+
             x = x.to(device)
             y = y.to(device)
 

@@ -8,7 +8,7 @@ import torch.nn.parallel
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-import mixmatch.dataset.cifar10 as dataset
+from mixmatch.dataset.cifar10 import get_dataloaders
 import mixmatch.models.wideresnet as models
 from utils.ema import WeightEMA
 from utils.eval import validate, train
@@ -47,8 +47,13 @@ def main(
         train_unl_dl,
         val_loader,
         test_loader,
-    ) = dataset.get_cifar10(
-        "./data", n_labeled, batch_size=batch_size, seed=seed
+        classes,
+    ) = get_dataloaders(
+        dataset_dir="./data",
+        train_lbl_size=0.005,
+        train_unl_size=0.980,
+        batch_size=batch_size,
+        seed=seed,
     )
 
     # Model
