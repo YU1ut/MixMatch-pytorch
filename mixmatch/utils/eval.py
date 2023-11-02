@@ -69,10 +69,10 @@ def train(
     model.train()
     for batch_idx in tqdm(range(train_iters)):
         try:
-            x_lbl, y_lbl = next(lbl_iter)
+            (x_lbl,), y_lbl = next(lbl_iter)
         except StopIteration:
             lbl_iter = iter(train_lbl_dl)
-            x_lbl, y_lbl = next(lbl_iter)
+            (x_lbl,), y_lbl = next(lbl_iter)
 
         try:
             x_unls, _ = next(unl_iter)
