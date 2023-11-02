@@ -1,13 +1,11 @@
-import os
-import shutil
 from typing import Callable
 
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.nn.parallel
 import torch.optim as optim
+from torch.nn import CrossEntropyLoss, MSELoss
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -68,10 +66,8 @@ class SemiLoss(object):
     ):
         probs_u = torch.softmax(outputs_u, dim=1)
 
-        l_x = -torch.mean(
-            torch.sum(F.log_softmax(outputs_x, dim=1) * targets_x, dim=1)
-        )
-        l_u = torch.mean((probs_u - targets_u) ** 2)
+        l_x = CrossEntropyLoss()(outputs_x, targets_x)
+        l_u = MSELoss()(probs_u, targets_u)
 
         return (
             l_x,
