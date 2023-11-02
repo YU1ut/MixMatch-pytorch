@@ -1,6 +1,5 @@
 import os
 import shutil
-import time
 from typing import Callable
 
 import numpy as np
@@ -9,7 +8,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.parallel
 import torch.optim as optim
-from progress.bar import Bar
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -173,15 +171,11 @@ def train(
     epochs: int,
     t: float,
 ) -> tuple[float, float, float]:
-    batch_time = AverageMeter()
-    data_time = AverageMeter()
     losses = AverageMeter()
     losses_x = AverageMeter()
     losses_u = AverageMeter()
     ws = AverageMeter()
-    end = time.time()
 
-    bar = Bar("Training", max=train_iteration)
     labeled_train_iter = iter(labeled_trainloader)
     unlabeled_train_iter = iter(unlabeled_trainloader)
 
@@ -198,9 +192,6 @@ def train(
         except StopIteration:
             unlabeled_train_iter = iter(unlabeled_trainloader)
             (inputs_u, inputs_u2), _ = next(unlabeled_train_iter)
-
-        # measure data loading time
-        data_time.update(time.time() - end)
 
         batch_size = inputs_x.size(0)
 
@@ -282,30 +273,20 @@ def train(
         optimizer.step()
         ema_optimizer.step()
 
-        # measure elapsed time
-        batch_time.update(time.time() - end)
-        end = time.time()
-
         # plot progress
-        bar.suffix = (
-            "({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s |"
-            " Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | "
-            "Loss_x: {loss_x:.4f} | Loss_u: {loss_u:.4f} | "
-            "W: {w:.4f}"
-        ).format(
-            batch=batch_idx + 1,
-            size=train_iteration,
-            data=data_time.avg,
-            bt=batch_time.avg,
-            total=bar.elapsed_td,
-            eta=bar.eta_td,
-            loss=losses.avg,
-            loss_x=losses_x.avg,
-            loss_u=losses_u.avg,
-            w=ws.avg,
-        )
-        bar.next()
-    bar.finish()
+        # bar.suffix = (
+        #     "({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s |"
+        #     " Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | "
+        #     "Loss_x: {loss_x:.4f} | Loss_u: {loss_u:.4f} | "
+        #     "W: {w:.4f}"
+        # ).format(
+        #     batch=batch_idx + 1,
+        #     size=train_iteration,
+        #     loss=losses.avg,
+        #     loss_x=losses_x.avg,
+        #     loss_u=losses_u.avg,
+        #     w=ws.avg,
+        # )
 
     return (
         losses.avg,
