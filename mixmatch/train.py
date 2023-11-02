@@ -19,8 +19,7 @@ def validate(
     valloader: DataLoader,
     model: nn.Module,
     criterion: Callable,
-    use_cuda: bool,
-    mode: str,
+    device: str,
 ):
     losses = AverageMeter()
     top1 = AverageMeter()
@@ -30,10 +29,8 @@ def validate(
     model.eval()
     with torch.no_grad():
         for batch_idx, (inputs, targets) in tqdm(enumerate(valloader)):
-            if use_cuda:
-                inputs, targets = inputs.cuda(), targets.cuda(
-                    non_blocking=True
-                )
+            inputs = inputs.to(device)
+            targets = targets.to(device)
             # compute output
             outputs = model(inputs)
             loss = criterion(outputs, targets.long())

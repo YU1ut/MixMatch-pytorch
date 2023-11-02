@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.parallel
 import torch.optim as optim
+from torch.utils.data import DataLoader
 
 import mixmatch.dataset.cifar10 as dataset
 import mixmatch.models.wideresnet as models
@@ -101,27 +102,18 @@ def main(
             epochs=epochs,
             t=t,
         )
-        _, train_acc = validate(
-            valloader=labeled_trainloader,
-            model=ema_model,
-            criterion=criterion,
-            use_cuda=use_cuda,
-            mode="Train Stats",
-        )
-        val_loss, val_acc = validate(
-            valloader=val_loader,
-            model=ema_model,
-            criterion=criterion,
-            use_cuda=use_cuda,
-            mode="Valid Stats",
-        )
-        test_loss, test_acc = validate(
-            valloader=test_loader,
-            model=ema_model,
-            criterion=criterion,
-            use_cuda=use_cuda,
-            mode="Test Stats ",
-        )
+
+        def val_ema(dl: DataLoader):
+            return validate(
+                valloader=dl,
+                model=ema_model,
+                criterion=criterion,
+                device=device,
+            )
+
+        _, train_acc = val_ema(labeled_trainloader)
+        val_loss, val_acc = val_ema(val_loader)
+        test_loss, test_acc = val_ema(test_loader)
 
         best_acc = max(val_acc, best_acc)
         test_accs.append(test_acc)
