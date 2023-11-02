@@ -56,6 +56,7 @@ best_acc = 0  # best test accuracy
 
 
 def train(
+    *,
     labeled_trainloader: DataLoader,
     unlabeled_trainloader: DataLoader,
     model: nn.Module,
@@ -205,6 +206,7 @@ def train(
 
 
 def validate(
+    *,
     valloader: DataLoader,
     model: nn.Module,
     criterion: Callable,

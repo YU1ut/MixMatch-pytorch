@@ -85,7 +85,9 @@ def main(
         unlabeled_trainloader,
         val_loader,
         test_loader,
-    ) = dataset.get_cifar10("./data", n_labeled, batch_size=batch_size, seed=SEED)
+    ) = dataset.get_cifar10(
+        "./data", n_labeled, batch_size=batch_size, seed=SEED
+    )
 
     # Model
     print("==> creating WRN-28-2")
@@ -139,37 +141,37 @@ def main(
         print("\nEpoch: [%d | %d] LR: %f" % (epoch + 1, epochs, state["lr"]))
 
         train_loss, train_loss_x, train_loss_u = train(
-            labeled_trainloader,
-            unlabeled_trainloader,
-            model,
-            optimizer,
-            ema_optimizer,
-            train_criterion,
-            epoch,
-            use_cuda,
+            labeled_trainloader=labeled_trainloader,
+            unlabeled_trainloader=unlabeled_trainloader,
+            model=model,
+            optimizer=optimizer,
+            ema_optimizer=ema_optimizer,
+            criterion=train_criterion,
+            epoch=epoch,
+            use_cuda=use_cuda,
         )
         _, train_acc = validate(
-            labeled_trainloader,
-            ema_model,
-            criterion,
-            epoch,
-            use_cuda,
+            valloader=labeled_trainloader,
+            model=ema_model,
+            criterion=criterion,
+            epoch=epoch,
+            use_cuda=use_cuda,
             mode="Train Stats",
         )
         val_loss, val_acc = validate(
-            val_loader,
-            ema_model,
-            criterion,
-            epoch,
-            use_cuda,
+            valloader=val_loader,
+            model=ema_model,
+            criterion=criterion,
+            epoch=epoch,
+            use_cuda=use_cuda,
             mode="Valid Stats",
         )
         test_loss, test_acc = validate(
-            test_loader,
-            ema_model,
-            criterion,
-            epoch,
-            use_cuda,
+            valloader=test_loader,
+            model=ema_model,
+            criterion=criterion,
+            epoch=epoch,
+            use_cuda=use_cuda,
             mode="Test Stats ",
         )
 
