@@ -1,239 +1,153 @@
+from pathlib import Path
+from typing import Callable, Sequence, List
+
 import numpy as np
+from sklearn.model_selection import train_test_split, StratifiedShuffleSplit
+from torch.utils.data import DataLoader, Subset, Dataset
+from torch.utils.data.dataset import T_co
+from torchvision.datasets import CIFAR10
+
 import torch
-import torch.nn.parallel
-import torchvision
-import torchvision.transforms as transforms
-from torch.utils.data import DataLoader
-from torchvision.transforms.v2 import ToTensor
+from torchvision import transforms
+from torchvision.transforms.v2 import (
+    RandomHorizontalFlip,
+    RandomVerticalFlip,
+    RandomCrop,
+)
 
-cifar10_mean = (
-    0.4914,
-    0.4822,
-    0.4465,
-)  # equals np.mean(train_set.train_data, axis=(0,1,2))/255
-cifar10_std = (
-    0.2471,
-    0.2435,
-    0.2616,
-)  # equals np.std(train_set.train_data, axis=(0,1,2))/255
+# from torchvision.transforms.v2 import AutoAugmentPolicy, AutoAugment
 
-
-def normalize(x, mean=cifar10_mean, std=cifar10_std):
-    x, mean, std = [np.array(a, np.float32) for a in (x, mean, std)]
-    x -= mean * 255
-    x *= 1.0 / (255 * std)
-    return x
+tf_preproc = transforms.Compose(
+    [
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261)),
+    ]
+)
 
 
-def transpose(x, source="NHWC", target="NCHW"):
-    return x.transpose([source.index(d) for d in target])
+tf_aug = transforms.Compose(
+    [
+        lambda x: torch.nn.functional.pad(
+            x,
+            (
+                4,
+                4,
+                4,
+                4,
+            ),
+            mode="reflect",
+        ),
+        RandomCrop(32),
+        RandomHorizontalFlip(),
+    ]
+)
 
 
-def pad(x, border=4):
-    return np.pad(
-        x, [(0, 0), (border, border), (border, border)], mode="reflect"
-    )
+class SubsetKAugments(Subset):
+    def __init__(
+        self,
+        dataset: Dataset,
+        indices: Sequence[int],
+        augment: Callable,
+        k: int,
+    ):
+        super().__init__(dataset, indices)
+        self.augment = augment
+        self.k = k
+
+    def __getitems__(self, indices: List[int]) -> List:
+        xs: list[tuple[torch.Tensor, int]] = super().__getitems__(indices)
+        # [(x1, y1), (x2, y2), ...]
+        xs_aug = [(tuple(tf_aug(x) for _ in range(self.k)), y) for x, y in xs]
+        return xs_aug
 
 
-class RandomPadandCrop(object):
-    """Crop randomly the image.
+def get_dataloaders(
+    dataset_dir: Path | str,
+    train_lbl_size: float = 0.005,
+    train_unl_size: float = 0.980,
+    batch_size: int = 48,
+    num_workers: int = 0,
+    seed: int = 42,
+) -> tuple[DataLoader, DataLoader, DataLoader, DataLoader, list[str]]:
+    """Get the dataloaders for the CIFAR10 dataset.
+
+    Notes:
+        The train_lbl_size and train_unl_size must sum to less than 1.
+        The leftover data is used for the validation set.
 
     Args:
-        output_size (tuple or int): Desired output size. If int, square crop
-            is made.
+        dataset_dir: The directory where the dataset is stored.
+        train_lbl_size: The size of the labelled training set.
+        train_unl_size: The size of the unlabelled training set.
+        batch_size: The batch size.
+        num_workers: The number of workers for the dataloaders.
+        seed: The seed for the random number generators.
+
+    Returns:
+        4 DataLoaders: train_lbl_dl, train_unl_dl, val_unl_dl, test_dl
     """
-
-    def __init__(self, output_size):
-        assert isinstance(output_size, (int, tuple))
-        if isinstance(output_size, int):
-            self.output_size = (output_size, output_size)
-        else:
-            assert len(output_size) == 2
-            self.output_size = output_size
-
-    def __call__(self, x):
-        x = pad(x, 4)
-
-        h, w = x.shape[1:]
-        new_h, new_w = self.output_size
-
-        top = np.random.randint(0, h - new_h)
-        left = np.random.randint(0, w - new_w)
-
-        x = x[:, top : top + new_h, left : left + new_w]
-
-        return x
-
-
-class RandomFlip(object):
-    """Flip randomly the image."""
-
-    def __call__(self, x):
-        if np.random.rand() < 0.5:
-            x = x[:, :, ::-1]
-
-        return x.copy()
-
-
-class CIFAR10_labeled(torchvision.datasets.CIFAR10):
-    def __init__(
-        self,
-        root,
-        indexs=None,
-        train=True,
-        transform=None,
-        target_transform=None,
-        download=False,
-    ):
-        super(CIFAR10_labeled, self).__init__(
-            root,
-            train=train,
-            transform=transform,
-            target_transform=target_transform,
-            download=download,
-        )
-        if indexs is not None:
-            self.data = self.data[indexs]
-            self.targets = np.array(self.targets)[indexs]
-        self.data = transpose(normalize(self.data))
-
-    def __getitem__(self, index):
-        """
-        Args:
-            index (int): Index
-
-        Returns:
-            tuple: (image, target) where target is index of the target class.
-        """
-        img, target = self.data[index], self.targets[index]
-
-        if self.transform is not None:
-            img = self.transform(img)
-
-        if self.target_transform is not None:
-            target = self.target_transform(target)
-
-        return img, target
-
-
-class CIFAR10_unlabeled(CIFAR10_labeled):
-    def __init__(
-        self,
-        root,
-        indexs,
-        train=True,
-        transform=None,
-        target_transform=None,
-        download=False,
-    ):
-        super(CIFAR10_unlabeled, self).__init__(
-            root,
-            indexs,
-            train=train,
-            transform=transform,
-            target_transform=target_transform,
-            download=download,
-        )
-        self.targets = np.array([-1 for i in range(len(self.targets))])
-
-
-class TransformTwice:
-    def __init__(self, transform):
-        self.transform = transform
-
-    def __call__(self, inp):
-        out1 = self.transform(inp)
-        out2 = self.transform(inp)
-        return out1, out2
-
-
-transform_train = transforms.Compose(
-    [
-        RandomPadandCrop(32),
-        RandomFlip(),
-        ToTensor(),
-    ]
-)
-
-transform_val = transforms.Compose(
-    [
-        ToTensor(),
-    ]
-)
-
-
-def get_cifar10(root, n_labeled, batch_size, download=True, seed=42):
     torch.manual_seed(seed)
     np.random.seed(seed)
-    base_dataset = torchvision.datasets.CIFAR10(
-        root, train=True, download=download
-    )
-    train_labeled_idxs, train_unlabeled_idxs, val_idxs = train_val_split(
-        base_dataset.targets, int(n_labeled / 10)
-    )
-
-    train_labeled_dataset = CIFAR10_labeled(
-        root, train_labeled_idxs, train=True, transform=transform_train
-    )
-    train_unlabeled_dataset = CIFAR10_unlabeled(
-        root,
-        train_unlabeled_idxs,
+    src_train_ds = CIFAR10(
+        dataset_dir,
         train=True,
-        transform=TransformTwice(transform_train),
+        download=True,
+        transform=tf_preproc,
     )
-    val_dataset = CIFAR10_labeled(
-        root, val_idxs, train=True, transform=transform_val, download=True
-    )
-    test_dataset = CIFAR10_labeled(
-        root, train=False, transform=transform_val, download=True
-    )
-
-    print(
-        f"#Labeled: {len(train_labeled_idxs)} #Unlabeled: {len(train_unlabeled_idxs)} #Val: {len(val_idxs)}"
+    src_test_ds = CIFAR10(
+        dataset_dir,
+        train=False,
+        download=True,
+        transform=tf_preproc,
     )
 
-    labeled_trainloader = DataLoader(
-        train_labeled_dataset,
+    train_size = len(src_train_ds)
+    train_unl_size = int(train_size * train_unl_size)
+    train_lbl_size = int(train_size * train_lbl_size)
+    val_size = int(train_size - train_unl_size - train_lbl_size)
+
+    targets = np.array(src_train_ds.targets)
+    ixs = np.arange(len(targets))
+    train_unl_ixs, lbl_ixs = train_test_split(
+        ixs,
+        train_size=train_unl_size,
+        stratify=targets,
+    )
+    lbl_targets = targets[lbl_ixs]
+
+    val_ixs, train_lbl_ixs = train_test_split(
+        lbl_ixs,
+        train_size=val_size,
+        stratify=lbl_targets,
+    )
+
+    train_lbl_ds = Subset(src_train_ds, train_lbl_ixs)
+    train_unl_ds = SubsetKAugments(
+        src_train_ds, train_unl_ixs, augment=tf_aug, k=2
+    )
+    val_ds = Subset(src_train_ds, val_ixs)
+
+    dl_args = dict(
         batch_size=batch_size,
-        shuffle=True,
-        num_workers=0,
+        num_workers=num_workers,
+        pin_memory=True,
         drop_last=True,
     )
-    unlabeled_trainloader = DataLoader(
-        train_unlabeled_dataset,
-        batch_size=batch_size,
-        shuffle=True,
-        num_workers=0,
-        drop_last=True,
-    )
-    val_loader = DataLoader(
-        val_dataset, batch_size=batch_size, shuffle=False, num_workers=0
-    )
-    test_loader = DataLoader(
-        test_dataset, batch_size=batch_size, shuffle=False, num_workers=0
-    )
+
+    # We use drop_last=True to ensure that the batch size is always the same
+    # This is crucial as we need to average the predictions across the batch
+    # size axis.
+
+    train_lbl_dl = DataLoader(train_lbl_ds, shuffle=True, **dl_args)
+    train_unl_dl = DataLoader(train_unl_ds, shuffle=True, **dl_args)
+    val_dl = DataLoader(val_ds, shuffle=False, **dl_args)
+    test_dl = DataLoader(src_test_ds, shuffle=False, **dl_args)
+
     return (
-        labeled_trainloader,
-        unlabeled_trainloader,
-        val_loader,
-        test_loader,
+        train_lbl_dl,
+        train_unl_dl,
+        val_dl,
+        test_dl,
+        src_train_ds.classes,
     )
-
-
-def train_val_split(labels, n_labeled_per_class):
-    labels = np.array(labels)
-    train_labeled_idxs = []
-    train_unlabeled_idxs = []
-    val_idxs = []
-
-    for i in range(10):
-        idxs = np.where(labels == i)[0]
-        np.random.shuffle(idxs)
-        train_labeled_idxs.extend(idxs[:n_labeled_per_class])
-        train_unlabeled_idxs.extend(idxs[n_labeled_per_class:-500])
-        val_idxs.extend(idxs[-500:])
-    np.random.shuffle(train_labeled_idxs)
-    np.random.shuffle(train_unlabeled_idxs)
-    np.random.shuffle(val_idxs)
-
-    return train_labeled_idxs, train_unlabeled_idxs, val_idxs
