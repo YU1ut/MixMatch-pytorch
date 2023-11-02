@@ -1,4 +1,3 @@
-import os
 import random
 from copy import deepcopy
 
@@ -44,8 +43,8 @@ def main(
     print(f"==> Preparing cifar10")
 
     (
-        labeled_trainloader,
-        unlabeled_trainloader,
+        train_lbl_dl,
+        train_unl_dl,
         val_loader,
         test_loader,
     ) = dataset.get_cifar10(
@@ -66,24 +65,24 @@ def main(
         % (sum(p.numel() for p in model.parameters()) / 1000000.0)
     )
 
-    train_criterion = SemiLoss()
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=lr)
+    train_loss_fn = SemiLoss()
+    val_loss_fn = nn.CrossEntropyLoss()
+    train_optim = optim.Adam(model.parameters(), lr=lr)
 
-    ema_optimizer = WeightEMA(model, ema_model, alpha=ema_decay, lr=lr)
+    ema_optim = WeightEMA(model, ema_model, alpha=ema_decay, lr=lr)
 
     test_accs = []
     # Train and val
     for epoch in range(epochs):
         print("\nEpoch: [%d | %d] LR: %f" % (epoch + 1, epochs, lr))
 
-        train_loss, train_loss_x, train_loss_u = train(
-            train_lbl_dl=labeled_trainloader,
-            train_unl_dl=unlabeled_trainloader,
+        train_loss, train_lbl_loss, train_unl_loss = train(
+            train_lbl_dl=train_lbl_dl,
+            train_unl_dl=train_unl_dl,
             model=model,
-            optim=optimizer,
-            ema_optim=ema_optimizer,
-            loss_fn=train_criterion,
+            optim=train_optim,
+            ema_optim=ema_optim,
+            loss_fn=train_loss_fn,
             epoch=epoch,
             device="cuda",
             train_iters=train_iteration,
@@ -97,11 +96,11 @@ def main(
             return validate(
                 valloader=dl,
                 model=ema_model,
-                loss_fn=criterion,
+                loss_fn=val_loss_fn,
                 device=device,
             )
 
-        _, train_acc = val_ema(labeled_trainloader)
+        _, train_acc = val_ema(train_lbl_dl)
         val_loss, val_acc = val_ema(val_loader)
         test_loss, test_acc = val_ema(test_loader)
 
@@ -115,8 +114,8 @@ def main(
             f"Best Acc: {best_acc:.3f} | "
             f"Mean Acc: {np.mean(test_accs[-20:]):.3f} | "
             f"LR: {lr:.5f} | "
-            f"Train Loss X: {train_loss_x:.3f} | "
-            f"Train Loss U: {train_loss_u:.3f} "
+            f"Train Loss X: {train_lbl_loss:.3f} | "
+            f"Train Loss U: {train_unl_loss:.3f} "
         )
 
     print("Best acc:")
