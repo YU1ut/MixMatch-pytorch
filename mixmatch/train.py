@@ -160,10 +160,10 @@ def train(
             inputs_x, targets_x = next(labeled_train_iter)
 
         try:
-            (inputs_u, inputs_u2), _ = next(unlabeled_train_iter)
+            inputs_u, _ = next(unlabeled_train_iter)
         except StopIteration:
             unlabeled_train_iter = iter(unlabeled_trainloader)
-            (inputs_u, inputs_u2), _ = next(unlabeled_train_iter)
+            inputs_u, _ = next(unlabeled_train_iter)
 
         batch_size = inputs_x.size(0)
 
@@ -172,23 +172,19 @@ def train(
 
         inputs_x = inputs_x.to(device)
         targets_x = targets_x.to(device)
-        inputs_u = inputs_u.to(device)
-        inputs_u2 = inputs_u2.to(device)
+        inputs_u = [u.to(device) for u in inputs_u]
+        # inputs_u2 = inputs_u2.to(device)
 
         with torch.no_grad():
             # compute guessed labels of unlabel samples
-            outputs_u = model(inputs_u)
-            outputs_u2 = model(inputs_u2)
-            p = (
-                torch.softmax(outputs_u, dim=1)
-                + torch.softmax(outputs_u2, dim=1)
-            ) / 2
+            outputs_u = [torch.softmax(model(u), dim=1) for u in inputs_u]
+            p = sum(outputs_u) / 2
             pt = p ** (1 / t)
             targets_u = pt / pt.sum(dim=1, keepdim=True)
             targets_u = targets_u.detach()
 
         # mixup
-        all_inputs = torch.cat([inputs_x, inputs_u, inputs_u2], dim=0)
+        all_inputs = torch.cat([inputs_x, *inputs_u], dim=0)
         all_targets = torch.cat([targets_x, targets_u, targets_u], dim=0)
 
         ratio = np.random.beta(alpha, alpha)
