@@ -15,6 +15,18 @@ from utils.interleave import interleave
 from utils.loss import SemiLoss
 
 
+def guess_labels(
+    model: nn.Module,
+    x_unls: list[torch.Tensor],
+    sharpen_temp: float,
+) -> torch.Tensor:
+    """Guess labels from the unlabelled data"""
+    y_unls = [torch.softmax(model(u), dim=1) for u in x_unls]
+    p = sum(y_unls) / 2
+    pt = p ** (1 / sharpen_temp)
+    return pt / pt.sum(dim=1, keepdim=True).detach()
+
+
 def train(
     *,
     train_lbl_dl: DataLoader,
@@ -63,11 +75,11 @@ def train(
         x_unls = [u.to(device) for u in x_unls]
 
         with torch.no_grad():
-            # compute guessed labels of unlabel samples
-            y_unls = [torch.softmax(model(u), dim=1) for u in x_unls]
-            p = sum(y_unls) / 2
-            pt = p ** (1 / sharpen_temp)
-            y_unl = pt / pt.sum(dim=1, keepdim=True).detach()
+            y_unl = guess_labels(
+                model=model,
+                x_unls=x_unls,
+                sharpen_temp=sharpen_temp,
+            )
 
         # mixup
         x = torch.cat([x_lbl, *x_unls], dim=0)
