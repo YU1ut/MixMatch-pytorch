@@ -4,8 +4,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.parallel
-import torch.optim as optim
 from torch.nn.functional import one_hot
+from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 from torchmetrics.functional import accuracy
 from tqdm import tqdm
@@ -16,8 +16,8 @@ from utils.loss import SemiLoss
 
 
 def mix_up(
-    x: nn.Module,
-    y: nn.Module,
+    x: torch.Tensor,
+    y: torch.Tensor,
     alpha: float,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     ratio = np.random.beta(alpha, alpha)
@@ -47,7 +47,7 @@ def train(
     train_lbl_dl: DataLoader,
     train_unl_dl: DataLoader,
     model: nn.Module,
-    optim: optim.Optimizer,
+    optim: Optimizer,
     ema_optim: WeightEMA,
     loss_fn: SemiLoss,
     epoch: int,
