@@ -128,109 +128,107 @@ def interleave(xy, batch):
 
 def train(
     *,
-    labeled_trainloader: DataLoader,
-    unlabeled_trainloader: DataLoader,
+    train_lbl_dl: DataLoader,
+    train_unl_dl: DataLoader,
     model: nn.Module,
-    optimizer: optim.Optimizer,
-    ema_optimizer,
-    criterion: SemiLoss,
+    optim: optim.Optimizer,
+    ema_optim: WeightEMA,
+    loss_fn: SemiLoss,
     epoch: int,
-    device: str,
-    train_iteration: int,
-    lambda_u: float,
-    alpha: float,
     epochs: int,
-    t: float,
+    device: str,
+    train_iters: int,
+    lambda_u: float,
+    mix_beta_alpha: float,
+    sharpen_temp: float,
 ) -> tuple[float, float, float]:
     losses = []
     losses_x = []
     losses_u = []
     n = []
 
-    labeled_train_iter = iter(labeled_trainloader)
-    unlabeled_train_iter = iter(unlabeled_trainloader)
+    lbl_iter = iter(train_lbl_dl)
+    unl_iter = iter(train_unl_dl)
 
     model.train()
-    for batch_idx in tqdm(range(train_iteration)):
+    for batch_idx in tqdm(range(train_iters)):
         try:
-            inputs_x, targets_x = next(labeled_train_iter)
+            x_lbl, y_lbl = next(lbl_iter)
         except StopIteration:
-            labeled_train_iter = iter(labeled_trainloader)
-            inputs_x, targets_x = next(labeled_train_iter)
+            lbl_iter = iter(train_lbl_dl)
+            x_lbl, y_lbl = next(lbl_iter)
 
         try:
-            inputs_u, _ = next(unlabeled_train_iter)
+            x_unls, _ = next(unl_iter)
         except StopIteration:
-            unlabeled_train_iter = iter(unlabeled_trainloader)
-            inputs_u, _ = next(unlabeled_train_iter)
+            unl_iter = iter(train_unl_dl)
+            x_unls, _ = next(unl_iter)
 
-        batch_size = inputs_x.size(0)
+        batch_size = x_lbl.size(0)
 
         # Transform label to one-hot
-        targets_x = one_hot(targets_x.long(), num_classes=10)
+        y_lbl = one_hot(y_lbl.long(), num_classes=10)
 
-        inputs_x = inputs_x.to(device)
-        targets_x = targets_x.to(device)
-        inputs_u = [u.to(device) for u in inputs_u]
+        x_lbl = x_lbl.to(device)
+        y_lbl = y_lbl.to(device)
+        x_unls = [u.to(device) for u in x_unls]
 
         with torch.no_grad():
             # compute guessed labels of unlabel samples
-            outputs_u = [torch.softmax(model(u), dim=1) for u in inputs_u]
-            p = sum(outputs_u) / 2
-            pt = p ** (1 / t)
-            targets_u = pt / pt.sum(dim=1, keepdim=True)
-            targets_u = targets_u.detach()
+            y_unls = [torch.softmax(model(u), dim=1) for u in x_unls]
+            p = sum(y_unls) / 2
+            pt = p ** (1 / sharpen_temp)
+            y_unl = pt / pt.sum(dim=1, keepdim=True).detach()
 
         # mixup
-        all_inputs = torch.cat([inputs_x, *inputs_u], dim=0)
-        all_targets = torch.cat([targets_x, targets_u, targets_u], dim=0)
+        x = torch.cat([x_lbl, *x_unls], dim=0)
+        y = torch.cat([y_lbl, y_unl, y_unl], dim=0)
 
-        ratio = np.random.beta(alpha, alpha)
-
+        ratio = np.random.beta(mix_beta_alpha, mix_beta_alpha)
         ratio = max(ratio, 1 - ratio)
 
-        idx = torch.randperm(all_inputs.size(0))
+        shuf_idx = torch.randperm(x.size(0))
 
-        mixed_input = ratio * all_inputs + (1 - ratio) * all_inputs[idx]
-        mixed_target = ratio * all_targets + (1 - ratio) * all_targets[idx]
+        x_mix = ratio * x + (1 - ratio) * x[shuf_idx]
+        y_mix = ratio * y + (1 - ratio) * y[shuf_idx]
 
         # interleave labeled and unlabed samples between batches to
         # get correct batchnorm calculation
-        mixed_input = list(torch.split(mixed_input, batch_size))
-        mixed_input = interleave(mixed_input, batch_size)
+        x_mix = list(torch.split(x_mix, batch_size))
+        x_mix = interleave(x_mix, batch_size)
 
-        logits = [model(mixed_input[0])]
-        for x in mixed_input[1:]:
-            logits.append(model(x))
+        y_mix_pred = [model(x) for x in x_mix]
 
         # put interleaved samples back
-        logits = interleave(logits, batch_size)
-        logits_x = logits[0]
-        logits_u = torch.cat(logits[1:], dim=0)
+        y_mix_pred = interleave(y_mix_pred, batch_size)
+        y_mix_lbl_pred = y_mix_pred[0]
+        y_mix_lbl = y_mix[:batch_size]
+        y_mix_unl_pred = torch.cat(y_mix_pred[1:], dim=0)
+        y_mix_unl = y_mix[batch_size:]
 
-        l_x, l_u, w = criterion(
-            outputs_x=logits_x,
-            targets_x=mixed_target[:batch_size],
-            outputs_u=logits_u,
-            targets_u=mixed_target[batch_size:],
-            epoch=epoch + batch_idx / train_iteration,
+        loss_lbl, loss_unl, loss_unl_scale = loss_fn(
+            outputs_x=y_mix_lbl_pred,
+            targets_x=y_mix_lbl,
+            outputs_u=y_mix_unl_pred,
+            targets_u=y_mix_unl,
+            epoch=epoch + batch_idx / train_iters,
             lambda_u=lambda_u,
             epochs=epochs,
         )
 
-        loss = l_x + w * l_u
+        loss = loss_lbl + loss_unl_scale * loss_unl
 
         # record loss
         losses.append(loss)
-        losses_x.append(l_x)
-        losses_u.append(l_u)
-        n.append(inputs_x.size(0))
+        losses_x.append(loss_lbl)
+        losses_u.append(loss_unl)
+        n.append(x_lbl.size(0))
 
         # compute gradient and do SGD step
-        optimizer.zero_grad()
+        optim.zero_grad()
         loss.backward()
-        optimizer.step()
-        ema_optimizer.step()
+        optim.step()
+        ema_optim.step()
 
     return (
         sum([loss * n for loss, n in zip(losses, n)]) / sum(n),

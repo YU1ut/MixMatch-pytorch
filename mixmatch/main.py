@@ -88,19 +88,19 @@ def main(
         print("\nEpoch: [%d | %d] LR: %f" % (epoch + 1, epochs, lr))
 
         train_loss, train_loss_x, train_loss_u = train(
-            labeled_trainloader=labeled_trainloader,
-            unlabeled_trainloader=unlabeled_trainloader,
+            train_lbl_dl=labeled_trainloader,
+            train_unl_dl=unlabeled_trainloader,
             model=model,
-            optimizer=optimizer,
-            ema_optimizer=ema_optimizer,
-            criterion=train_criterion,
+            optim=optimizer,
+            ema_optim=ema_optimizer,
+            loss_fn=train_criterion,
             epoch=epoch,
             device="cuda",
-            train_iteration=train_iteration,
+            train_iters=train_iteration,
             lambda_u=lambda_u,
-            alpha=alpha,
+            mix_beta_alpha=alpha,
             epochs=epochs,
-            t=t,
+            sharpen_temp=t,
         )
 
         def val_ema(dl: DataLoader):
