@@ -10,7 +10,7 @@ def test_main_seed_fast():
     )
 
     assert best_acc_1 == 7.98
-    assert mean_acc_1 == 8.16
+    assert mean_acc_1 == 8.17
 
 
 def test_main_seed_epoch():

@@ -9,6 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.parallel
 import torch.optim as optim
+from tqdm import tqdm
 from progress.bar import Bar
 from torch.utils.data import DataLoader
 
@@ -76,7 +77,7 @@ def validate(
     end = time.time()
     bar = Bar(f"{mode}", max=len(valloader))
     with torch.no_grad():
-        for batch_idx, (inputs, targets) in enumerate(valloader):
+        for batch_idx, (inputs, targets) in tqdm(enumerate(valloader)):
             # measure data loading time
             data_time.update(time.time() - end)
 
@@ -99,21 +100,23 @@ def validate(
             end = time.time()
 
             # plot progress
-            bar.suffix = (
-                "({batch}/{size}) Data: {data:.3f}s | "
-                "Batch: {bt:.3f}s | "
-                "Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | "
-                "top1: {top1: .4f} | top5: {top5: .4f}"
-            ).format(
-                batch=batch_idx + 1,
-                size=len(valloader),
-                data=data_time.avg,
-                bt=batch_time.avg,
-                total=bar.elapsed_td,
-                eta=bar.eta_td,
-                loss=losses.avg,
-                top1=top1.avg,
-                top5=top5.avg,
+            print(
+                (
+                    "({batch}/{size}) Data: {data:.3f}s | "
+                    "Batch: {bt:.3f}s | "
+                    "Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | "
+                    "top1: {top1: .4f} | top5: {top5: .4f}"
+                ).format(
+                    batch=batch_idx + 1,
+                    size=len(valloader),
+                    data=data_time.avg,
+                    bt=batch_time.avg,
+                    total=bar.elapsed_td,
+                    eta=bar.eta_td,
+                    loss=losses.avg,
+                    top1=top1.avg,
+                    top5=top5.avg,
+                )
             )
             bar.next()
         bar.finish()
@@ -242,7 +245,7 @@ def train(
     unlabeled_train_iter = iter(unlabeled_trainloader)
 
     model.train()
-    for batch_idx in range(train_iteration):
+    for batch_idx in tqdm(range(train_iteration)):
         try:
             inputs_x, targets_x = next(labeled_train_iter)
         except StopIteration:
