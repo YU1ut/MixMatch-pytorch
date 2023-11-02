@@ -107,7 +107,7 @@ def main(
             return validate(
                 valloader=dl,
                 model=ema_model,
-                criterion=criterion,
+                loss_fn=criterion,
                 device=device,
             )
 

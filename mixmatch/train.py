@@ -15,7 +15,7 @@ def validate(
     *,
     valloader: DataLoader,
     model: nn.Module,
-    criterion: Callable,
+    loss_fn: Callable,
     device: str,
 ):
     n = []
@@ -24,28 +24,28 @@ def validate(
 
     model.eval()
     with torch.no_grad():
-        for batch_idx, (inputs, targets) in tqdm(enumerate(valloader)):
-            inputs = inputs.to(device)
-            targets = targets.to(device)
+        for x, y in tqdm(valloader):
+            x = x.to(device)
+            y = y.to(device)
             # compute output
-            outputs = model(inputs)
-            loss = criterion(outputs, targets.long())
+            y_pred = model(x)
+            loss = loss_fn(y_pred, y.long())
 
             # measure accuracy and record loss
             # TODO: Technically, we shouldn't * 100, but it's fine for now as
             #  it doesn't impact training
             acc = (
                 accuracy(
-                    outputs,
-                    targets,
+                    y_pred,
+                    y,
                     task="multiclass",
-                    num_classes=outputs.shape[1],
+                    num_classes=y_pred.shape[1],
                 )
                 * 100
             )
             losses.append(loss.item())
             accs.append(acc.item())
-            n.append(inputs.size(0))
+            n.append(x.size(0))
 
     # return weighted mean
     return (
