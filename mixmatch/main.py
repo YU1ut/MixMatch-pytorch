@@ -30,7 +30,6 @@ def main(
     lr: float = 0.002,
     n_labeled: int = 250,
     train_iteration: int = 1024,
-    out: str = "result",
     ema_decay: float = 0.999,
     lambda_u: float = 75,
     alpha: float = 0.75,
