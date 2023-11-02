@@ -65,6 +65,7 @@ def train(
     criterion: Callable,
     epoch: int,
     use_cuda: bool,
+    train_iteration: int,
 ) -> tuple[float, float, float]:
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -74,12 +75,12 @@ def train(
     ws = AverageMeter()
     end = time.time()
 
-    bar = Bar("Training", max=TRAIN_ITERATION)
+    bar = Bar("Training", max=train_iteration)
     labeled_train_iter = iter(labeled_trainloader)
     unlabeled_train_iter = iter(unlabeled_trainloader)
 
     model.train()
-    for batch_idx in range(TRAIN_ITERATION):
+    for batch_idx in range(train_iteration):
         try:
             inputs_x, targets_x = next(labeled_train_iter)
         except StopIteration:
@@ -156,7 +157,7 @@ def train(
             mixed_target[:batch_size],
             logits_u,
             mixed_target[batch_size:],
-            epoch + batch_idx / TRAIN_ITERATION,
+            epoch + batch_idx / train_iteration,
         )
 
         loss = l_x + w * l_u
@@ -185,7 +186,7 @@ def train(
             "W: {w:.4f}"
         ).format(
             batch=batch_idx + 1,
-            size=TRAIN_ITERATION,
+            size=train_iteration,
             data=data_time.avg,
             bt=batch_time.avg,
             total=bar.elapsed_td,

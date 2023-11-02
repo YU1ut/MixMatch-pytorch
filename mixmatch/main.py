@@ -149,6 +149,7 @@ def main(
             criterion=train_criterion,
             epoch=epoch,
             use_cuda=use_cuda,
+            train_iteration=train_iteration,
         )
         _, train_acc = validate(
             valloader=labeled_trainloader,
