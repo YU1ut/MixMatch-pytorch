@@ -14,40 +14,9 @@ from torch.utils.data import DataLoader
 
 from utils import AverageMeter, accuracy
 
-EPOCHS: int = 1024
-START_EPOCH: int = 0
-MANUAL_SEED: int = 0
-RESUME: str = ""
-GPU: str = "0"
-OUT: str = "result"
-BATCH_SIZE: int = 64
-LR: float = 0.002
-N_LABELED: int = 250
-TRAIN_ITERATION: int = 1024
-EMA_DECAY: float = 0.999
-ALPHA: float = 0.75
-LAMBDA_U: float = 75
-T: float = 0.5
-
-state = {
-    "epochs": EPOCHS,
-    "start_epoch": START_EPOCH,
-    "manual_seed": MANUAL_SEED,
-    "resume": RESUME,
-    "gpu": GPU,
-    "out": OUT,
-    "batch_size": BATCH_SIZE,
-    "lr": LR,
-    "n_labeled": N_LABELED,
-    "train_iteration": TRAIN_ITERATION,
-    "ema_decay": EMA_DECAY,
-    "alpha": ALPHA,
-    "lambda_u": LAMBDA_U,
-    "T": T,
-}
 
 # Use CUDA
-os.environ["CUDA_VISIBLE_DEVICES"] = GPU
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 use_cuda = torch.cuda.is_available()
 
 SEED = 42
@@ -65,6 +34,9 @@ def train(
     criterion: Callable,
     epoch: int,
     use_cuda: bool,
+    train_iteration: int,
+    alpha: float,
+    t: float,
 ) -> tuple[float, float, float]:
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -74,12 +46,12 @@ def train(
     ws = AverageMeter()
     end = time.time()
 
-    bar = Bar("Training", max=TRAIN_ITERATION)
+    bar = Bar("Training", max=train_iteration)
     labeled_train_iter = iter(labeled_trainloader)
     unlabeled_train_iter = iter(unlabeled_trainloader)
 
     model.train()
-    for batch_idx in range(TRAIN_ITERATION):
+    for batch_idx in range(train_iteration):
         try:
             inputs_x, targets_x = next(labeled_train_iter)
         except StopIteration:
@@ -117,7 +89,7 @@ def train(
                 torch.softmax(outputs_u, dim=1)
                 + torch.softmax(outputs_u2, dim=1)
             ) / 2
-            pt = p ** (1 / T)
+            pt = p ** (1 / t)
             targets_u = pt / pt.sum(dim=1, keepdim=True)
             targets_u = targets_u.detach()
 
@@ -125,7 +97,7 @@ def train(
         all_inputs = torch.cat([inputs_x, inputs_u, inputs_u2], dim=0)
         all_targets = torch.cat([targets_x, targets_u, targets_u], dim=0)
 
-        ratio = np.random.beta(ALPHA, ALPHA)
+        ratio = np.random.beta(0.75, 0.75)
 
         ratio = max(ratio, 1 - ratio)
 
@@ -156,7 +128,7 @@ def train(
             mixed_target[:batch_size],
             logits_u,
             mixed_target[batch_size:],
-            epoch + batch_idx / TRAIN_ITERATION,
+            epoch + batch_idx / train_iteration,
         )
 
         loss = l_x + w * l_u
@@ -185,7 +157,7 @@ def train(
             "W: {w:.4f}"
         ).format(
             batch=batch_idx + 1,
-            size=TRAIN_ITERATION,
+            size=train_iteration,
             data=data_time.avg,
             bt=batch_time.avg,
             total=bar.elapsed_td,
@@ -273,7 +245,7 @@ def validate(
 def save_checkpoint(
     state,
     is_best: bool,
-    checkpoint: str = OUT,
+    checkpoint: str = "result",
     filename: str = "checkpoint.pth.tar",
 ):
     filepath = os.path.join(checkpoint, filename)
@@ -284,7 +256,7 @@ def save_checkpoint(
         )
 
 
-def linear_rampup(current: int, rampup_length: int = EPOCHS):
+def linear_rampup(current: int, rampup_length: int):
     if rampup_length == 0:
         return 1.0
     else:
@@ -299,7 +271,9 @@ class SemiLoss(object):
         targets_x: torch.Tensor,
         outputs_u: torch.Tensor,
         targets_u: torch.Tensor,
+        lambda_u: float,
         epoch: int,
+        epochs: int,
     ):
         probs_u = torch.softmax(outputs_u, dim=1)
 
@@ -308,7 +282,7 @@ class SemiLoss(object):
         )
         l_u = torch.mean((probs_u - targets_u) ** 2)
 
-        return l_x, l_u, LAMBDA_U * linear_rampup(epoch)
+        return l_x, l_u, lambda_u * linear_rampup(epoch, epochs)
 
 
 class WeightEMA(object):
@@ -316,6 +290,7 @@ class WeightEMA(object):
         self,
         model: nn.Module,
         ema_model: nn.Module,
+        lr: float,
         alpha: float = 0.999,
     ):
         self.model = model
@@ -323,7 +298,7 @@ class WeightEMA(object):
         self.alpha = alpha
         self.params = list(model.state_dict().values())
         self.ema_params = list(ema_model.state_dict().values())
-        self.wd = 0.02 * LR
+        self.wd = 0.02 * lr
 
         for param, ema_param in zip(self.params, self.ema_params):
             param.data.copy_(ema_param.data)
