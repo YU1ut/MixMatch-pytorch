@@ -154,6 +154,7 @@ def main(
             train_iteration=train_iteration,
             lambda_u=lambda_u,
             alpha=alpha,
+            epochs=epochs,
         )
         _, train_acc = validate(
             valloader=labeled_trainloader,
@@ -216,6 +217,7 @@ def main(
                 "optimizer": optimizer.state_dict(),
             },
             is_best,
+            checkpoint=out,
         )
         test_accs.append(test_acc)
     logger.close()
