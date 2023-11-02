@@ -15,46 +15,6 @@ from torch.utils.data import DataLoader
 
 from utils import AverageMeter, accuracy
 
-EPOCHS: int = 1024
-START_EPOCH: int = 0
-MANUAL_SEED: int = 0
-RESUME: str = ""
-GPU: str = "0"
-OUT: str = "result"
-BATCH_SIZE: int = 64
-LR: float = 0.002
-N_LABELED: int = 250
-TRAIN_ITERATION: int = 1024
-EMA_DECAY: float = 0.999
-ALPHA: float = 0.75
-LAMBDA_U: float = 75
-T: float = 0.5
-
-state = {
-    "epochs": EPOCHS,
-    "start_epoch": START_EPOCH,
-    "manual_seed": MANUAL_SEED,
-    "resume": RESUME,
-    "gpu": GPU,
-    "out": OUT,
-    "batch_size": BATCH_SIZE,
-    "lr": LR,
-    "n_labeled": N_LABELED,
-    "train_iteration": TRAIN_ITERATION,
-    "ema_decay": EMA_DECAY,
-    "alpha": ALPHA,
-    "lambda_u": LAMBDA_U,
-    "T": T,
-}
-
-# Use CUDA
-os.environ["CUDA_VISIBLE_DEVICES"] = GPU
-use_cuda = torch.cuda.is_available()
-
-SEED = 42
-
-best_acc = 0  # best test accuracy
-
 
 def validate(
     *,
@@ -182,7 +142,7 @@ class WeightEMA(object):
         self.alpha = alpha
         self.params = list(model.state_dict().values())
         self.ema_params = list(ema_model.state_dict().values())
-        self.wd = 0.02 * LR
+        self.wd = 0.02 * lr
 
         for param, ema_param in zip(self.params, self.ema_params):
             param.data.copy_(ema_param.data)
