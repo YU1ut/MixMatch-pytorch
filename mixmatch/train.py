@@ -8,8 +8,7 @@ import torch.optim as optim
 from torch.nn.functional import cross_entropy, one_hot
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-
-from utils import accuracy
+from torchmetrics.functional import accuracy
 
 
 def validate(
@@ -21,7 +20,7 @@ def validate(
 ):
     n = []
     losses = []
-    top1 = []
+    accs = []
 
     model.eval()
     with torch.no_grad():
@@ -33,15 +32,25 @@ def validate(
             loss = criterion(outputs, targets.long())
 
             # measure accuracy and record loss
-            prec1 = accuracy(outputs, targets, topk=(1,))[0]
+            # TODO: Technically, we shouldn't * 100, but it's fine for now as
+            #  it doesn't impact training
+            acc = (
+                accuracy(
+                    outputs,
+                    targets,
+                    task="multiclass",
+                    num_classes=outputs.shape[1],
+                )
+                * 100
+            )
             losses.append(loss.item())
-            top1.append(prec1.item())
+            accs.append(acc.item())
             n.append(inputs.size(0))
 
     # return weighted mean
     return (
         sum([loss * n for loss, n in zip(losses, n)]) / sum(n),
-        sum([top * n for top, n in zip(top1, n)]) / sum(n),
+        sum([top * n for top, n in zip(accs, n)]) / sum(n),
     )
 
 
