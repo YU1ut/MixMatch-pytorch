@@ -15,13 +15,7 @@ from utils.ema import WeightEMA
 from utils.eval import validate, train
 from utils.loss import SemiLoss
 
-# Use CUDA
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-use_cuda = torch.cuda.is_available()
-
 SEED = 42
-
-best_acc = 0  # best test accuracy
 
 
 def main(
@@ -45,7 +39,7 @@ def main(
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-    global best_acc
+    best_acc = 0
 
     # Data
     print(f"==> Preparing cifar10")
