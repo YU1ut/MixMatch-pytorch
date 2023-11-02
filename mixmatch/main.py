@@ -160,7 +160,6 @@ def main(
             valloader=labeled_trainloader,
             model=ema_model,
             criterion=criterion,
-            epoch=epoch,
             use_cuda=use_cuda,
             mode="Train Stats",
         )
@@ -168,7 +167,6 @@ def main(
             valloader=val_loader,
             model=ema_model,
             criterion=criterion,
-            epoch=epoch,
             use_cuda=use_cuda,
             mode="Valid Stats",
         )
@@ -176,7 +174,6 @@ def main(
             valloader=test_loader,
             model=ema_model,
             criterion=criterion,
-            epoch=epoch,
             use_cuda=use_cuda,
             mode="Test Stats ",
         )

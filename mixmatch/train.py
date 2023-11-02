@@ -61,7 +61,6 @@ def validate(
     valloader: DataLoader,
     model: nn.Module,
     criterion: Callable,
-    epoch: int,
     use_cuda: bool,
     mode: str,
 ):
