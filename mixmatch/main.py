@@ -6,12 +6,11 @@ import torch
 import torch.nn as nn
 import torch.nn.parallel
 import torch.optim as optim
-from tensorboardX import SummaryWriter
 
 import mixmatch.dataset.cifar10 as dataset
 import mixmatch.models.wideresnet as models
 from train import SemiLoss, WeightEMA, validate, save_checkpoint, train
-from utils import mkdir_p, Logger
+from utils import mkdir_p
 
 EPOCHS: int = 1024
 START_EPOCH: int = 0
@@ -120,23 +119,6 @@ def main(
     ema_optimizer = WeightEMA(model, ema_model, alpha=ema_decay)
     start_epoch = 0
 
-    # Resume
-    title = "noisy-cifar-10"
-
-    logger = Logger(os.path.join(out, "log.txt"), title=title)
-    logger.set_names(
-        [
-            "Train Loss",
-            "Train Loss X",
-            "Train Loss U",
-            "Valid Loss",
-            "Valid Acc.",
-            "Test Loss",
-            "Test Acc.",
-        ]
-    )
-
-    writer = SummaryWriter(out)
     test_accs = []
     # Train and val
     for epoch in range(start_epoch, epochs):
@@ -178,29 +160,6 @@ def main(
             mode="Test Stats ",
         )
 
-        step = train_iteration * (epoch + 1)
-
-        writer.add_scalar("losses/train_loss", train_loss, step)
-        writer.add_scalar("losses/valid_loss", val_loss, step)
-        writer.add_scalar("losses/test_loss", test_loss, step)
-
-        writer.add_scalar("accuracy/train_acc", train_acc, step)
-        writer.add_scalar("accuracy/val_acc", val_acc, step)
-        writer.add_scalar("accuracy/test_acc", test_acc, step)
-
-        # append logger file
-        logger.append(
-            [
-                train_loss,
-                train_loss_x,
-                train_loss_u,
-                val_loss,
-                val_acc,
-                test_loss,
-                test_acc,
-            ]
-        )
-
         # save model
         is_best = val_acc > best_acc
         best_acc = max(val_acc, best_acc)
@@ -217,8 +176,6 @@ def main(
             checkpoint=out,
         )
         test_accs.append(test_acc)
-    logger.close()
-    writer.close()
 
     print("Best acc:")
     print(best_acc)
