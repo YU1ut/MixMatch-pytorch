@@ -21,9 +21,9 @@ def validate(
     criterion: Callable,
     device: str,
 ):
+    n = []
     losses = []
     top1 = []
-    top5 = []
 
     model.eval()
     with torch.no_grad():
@@ -35,12 +35,16 @@ def validate(
             loss = criterion(outputs, targets.long())
 
             # measure accuracy and record loss
-            prec1, prec5 = accuracy(outputs, targets, topk=(1, 5))
+            prec1 = accuracy(outputs, targets, topk=(1,))[0]
             losses.append(loss.item())
             top1.append(prec1.item())
-            top5.append(prec5.item())
+            n.append(inputs.size(0))
 
-    return np.mean(losses), np.mean(top1)
+    # return weighted mean
+    return (
+        sum([loss * n for loss, n in zip(losses, n)]) / sum(n),
+        sum([top * n for top, n in zip(top1, n)]) / sum(n),
+    )
 
 
 def save_checkpoint(
