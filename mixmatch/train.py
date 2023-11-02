@@ -13,11 +13,11 @@ from utils import accuracy
 
 
 def validate(
-        *,
-        valloader: DataLoader,
-        model: nn.Module,
-        criterion: Callable,
-        device: str,
+    *,
+    valloader: DataLoader,
+    model: nn.Module,
+    criterion: Callable,
+    device: str,
 ):
     n = []
     losses = []
@@ -55,14 +55,14 @@ class SemiLoss(object):
             return float(current)
 
     def __call__(
-            self,
-            outputs_x: torch.Tensor,
-            targets_x: torch.Tensor,
-            outputs_u: torch.Tensor,
-            targets_u: torch.Tensor,
-            epoch: float,
-            lambda_u: float,
-            epochs: int,
+        self,
+        outputs_x: torch.Tensor,
+        targets_x: torch.Tensor,
+        outputs_u: torch.Tensor,
+        targets_u: torch.Tensor,
+        epoch: float,
+        lambda_u: float,
+        epochs: int,
     ):
         probs_u = torch.softmax(outputs_u, dim=1)
 
@@ -80,11 +80,11 @@ class SemiLoss(object):
 
 class WeightEMA(object):
     def __init__(
-            self,
-            model: nn.Module,
-            ema_model: nn.Module,
-            alpha: float = 0.999,
-            lr: float = 0.002,
+        self,
+        model: nn.Module,
+        ema_model: nn.Module,
+        alpha: float = 0.999,
+        lr: float = 0.002,
     ):
         self.model = model
         self.ema_model = ema_model
@@ -120,32 +120,31 @@ def interleave_offsets(batch, nu):
 def interleave(xy, batch):
     nu = len(xy) - 1
     offsets = interleave_offsets(batch, nu)
-    xy = [[v[offsets[p]: offsets[p + 1]] for p in range(nu + 1)] for v in xy]
+    xy = [[v[offsets[p] : offsets[p + 1]] for p in range(nu + 1)] for v in xy]
     for i in range(1, nu + 1):
         xy[0][i], xy[i][i] = xy[i][i], xy[0][i]
     return [torch.cat(v, dim=0) for v in xy]
 
 
 def train(
-        *,
-        labeled_trainloader: DataLoader,
-        unlabeled_trainloader: DataLoader,
-        model: nn.Module,
-        optimizer: optim.Optimizer,
-        ema_optimizer,
-        criterion: SemiLoss,
-        epoch: int,
-        device: str,
-        train_iteration: int,
-        lambda_u: float,
-        alpha: float,
-        epochs: int,
-        t: float,
+    *,
+    labeled_trainloader: DataLoader,
+    unlabeled_trainloader: DataLoader,
+    model: nn.Module,
+    optimizer: optim.Optimizer,
+    ema_optimizer,
+    criterion: SemiLoss,
+    epoch: int,
+    device: str,
+    train_iteration: int,
+    lambda_u: float,
+    alpha: float,
+    epochs: int,
+    t: float,
 ) -> tuple[float, float, float]:
     losses = []
     losses_x = []
     losses_u = []
-    ws = []
     n = []
 
     labeled_train_iter = iter(labeled_trainloader)
@@ -225,7 +224,6 @@ def train(
         losses.append(loss)
         losses_x.append(l_x)
         losses_u.append(l_u)
-        ws.append(w)
         n.append(inputs_x.size(0))
 
         # compute gradient and do SGD step
