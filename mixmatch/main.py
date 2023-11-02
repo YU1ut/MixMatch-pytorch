@@ -13,7 +13,6 @@ import mixmatch.dataset.cifar10 as dataset
 import mixmatch.models.wideresnet as models
 from utils.ema import WeightEMA
 from utils.eval import validate, train
-from utils import mkdir_p
 from utils.loss import SemiLoss
 
 # Use CUDA
@@ -48,9 +47,6 @@ def main(
     torch.backends.cudnn.benchmark = False
 
     global best_acc
-
-    if not os.path.isdir(out):
-        mkdir_p(out)
 
     # Data
     print(f"==> Preparing cifar10")
