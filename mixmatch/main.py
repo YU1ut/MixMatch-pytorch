@@ -87,11 +87,10 @@ def main(
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
     ema_optimizer = WeightEMA(model, ema_model, alpha=ema_decay, lr=lr)
-    start_epoch = 0
 
     test_accs = []
     # Train and val
-    for epoch in range(start_epoch, epochs):
+    for epoch in range(epochs):
         print("\nEpoch: [%d | %d] LR: %f" % (epoch + 1, epochs, lr))
 
         train_loss, train_loss_x, train_loss_u = train(
