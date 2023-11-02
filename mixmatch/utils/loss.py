@@ -15,21 +15,21 @@ class SemiLoss(object):
 
     def __call__(
         self,
-        outputs_x: torch.Tensor,
-        targets_x: torch.Tensor,
-        outputs_u: torch.Tensor,
-        targets_u: torch.Tensor,
+        x_lbl: torch.Tensor,
+        y_lbl: torch.Tensor,
+        x_unl: torch.Tensor,
+        y_unl: torch.Tensor,
         epoch: float,
         lambda_u: float,
         epochs: int,
     ):
-        probs_u = torch.softmax(outputs_u, dim=1)
+        probs_u = torch.softmax(x_unl, dim=1)
 
-        l_x = cross_entropy(outputs_x, targets_x)
+        l_x = cross_entropy(x_lbl, y_lbl)
         # TODO: Not sure why this is different from MSELoss
         #  It's likely not a big deal, but it's worth investigating if we have
         #  too much time on our hands
-        l_u = torch.mean((probs_u - targets_u) ** 2)
+        l_u = torch.mean((probs_u - y_unl) ** 2)
         return (
             l_x,
             l_u,
