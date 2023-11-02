@@ -15,8 +15,6 @@ from utils.ema import WeightEMA
 from utils.eval import validate, train
 from utils.loss import SemiLoss
 
-SEED = 42
-
 
 def main(
     epochs: int = 1024,
@@ -29,12 +27,12 @@ def main(
     alpha: float = 0.75,
     t: float = 0.5,
     device: str = "cuda",
+    seed: int = 42,
 ):
-    random.seed(42)
-    np.random.seed(42)
-
-    torch.manual_seed(42)
-    torch.cuda.manual_seed_all(42)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
 
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
@@ -50,7 +48,7 @@ def main(
         val_loader,
         test_loader,
     ) = dataset.get_cifar10(
-        "./data", n_labeled, batch_size=batch_size, seed=SEED
+        "./data", n_labeled, batch_size=batch_size, seed=seed
     )
 
     # Model
