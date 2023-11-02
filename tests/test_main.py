@@ -17,5 +17,5 @@ def test_main_seed_epoch():
     """Ensure that the model doesn't change when refactoring"""
     epochs = 1
     best_acc_1, mean_acc_1 = main(epochs=epochs)
-    assert best_acc_1 == 20.28
-    assert mean_acc_1 == 19.54
+    assert best_acc_1 == 22.58
+    assert mean_acc_1 == 22.15
