@@ -123,7 +123,7 @@ def validate(
 def save_checkpoint(
     state,
     is_best: bool,
-    checkpoint: str = OUT,
+    checkpoint: str,
     filename: str = "checkpoint.pth.tar",
 ):
     filepath = os.path.join(checkpoint, filename)
@@ -134,7 +134,7 @@ def save_checkpoint(
         )
 
 
-def linear_rampup(current: int, rampup_length: int = EPOCHS):
+def linear_rampup(current: int, rampup_length: int):
     if rampup_length == 0:
         return 1.0
     else:
@@ -220,6 +220,8 @@ def train(
     epoch: int,
     use_cuda: bool,
     train_iteration: int,
+    lambda_u: float,
+    alpha: float,
 ) -> tuple[float, float, float]:
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -280,7 +282,7 @@ def train(
         all_inputs = torch.cat([inputs_x, inputs_u, inputs_u2], dim=0)
         all_targets = torch.cat([targets_x, targets_u, targets_u], dim=0)
 
-        ratio = np.random.beta(ALPHA, ALPHA)
+        ratio = np.random.beta(alpha, alpha)
 
         ratio = max(ratio, 1 - ratio)
 
@@ -312,7 +314,7 @@ def train(
             outputs_u=logits_u,
             targets_u=mixed_target[batch_size:],
             epoch=epoch + batch_idx / train_iteration,
-            lambda_u=LAMBDA_U,
+            lambda_u=lambda_u,
         )
 
         loss = l_x + w * l_u

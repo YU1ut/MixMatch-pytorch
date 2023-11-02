@@ -62,6 +62,8 @@ def main(
     train_iteration: int = 1024,
     out: str = "result",
     ema_decay: float = 0.999,
+    lambda_u: float = 75,
+    alpha: float = 0.75,
 ):
     random.seed(42)
     np.random.seed(42)
@@ -150,6 +152,8 @@ def main(
             epoch=epoch,
             use_cuda=use_cuda,
             train_iteration=train_iteration,
+            lambda_u=lambda_u,
+            alpha=alpha,
         )
         _, train_acc = validate(
             valloader=labeled_trainloader,
