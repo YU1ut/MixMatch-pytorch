@@ -4,6 +4,7 @@ import torch.nn.parallel
 import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
+from torchvision.transforms.v2 import ToTensor
 
 cifar10_mean = (
     0.4914,
@@ -29,7 +30,9 @@ def transpose(x, source="NHWC", target="NCHW"):
 
 
 def pad(x, border=4):
-    return np.pad(x, [(0, 0), (border, border), (border, border)], mode="reflect")
+    return np.pad(
+        x, [(0, 0), (border, border), (border, border)], mode="reflect"
+    )
 
 
 class RandomPadandCrop(object):
@@ -70,23 +73,6 @@ class RandomFlip(object):
             x = x[:, :, ::-1]
 
         return x.copy()
-
-
-class GaussianNoise(object):
-    """Add gaussian noise to the image."""
-
-    def __call__(self, x):
-        c, h, w = x.shape
-        x += np.random.randn(c, h, w) * 0.15
-        return x
-
-
-class ToTensor(object):
-    """Transform the image to tensor."""
-
-    def __call__(self, x):
-        x = torch.from_numpy(x)
-        return x
 
 
 class CIFAR10_labeled(torchvision.datasets.CIFAR10):
@@ -179,7 +165,9 @@ transform_val = transforms.Compose(
 def get_cifar10(root, n_labeled, batch_size, download=True, seed=42):
     torch.manual_seed(seed)
     np.random.seed(seed)
-    base_dataset = torchvision.datasets.CIFAR10(root, train=True, download=download)
+    base_dataset = torchvision.datasets.CIFAR10(
+        root, train=True, download=download
+    )
     train_labeled_idxs, train_unlabeled_idxs, val_idxs = train_val_split(
         base_dataset.targets, int(n_labeled / 10)
     )
