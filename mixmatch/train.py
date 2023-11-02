@@ -134,7 +134,7 @@ def save_checkpoint(
         )
 
 
-def linear_rampup(current: int, rampup_length: int):
+def linear_rampup(current: float, rampup_length: int):
     if rampup_length == 0:
         return 1.0
     else:
@@ -149,8 +149,9 @@ class SemiLoss(object):
         targets_x: torch.Tensor,
         outputs_u: torch.Tensor,
         targets_u: torch.Tensor,
-        epoch: int,
+        epoch: float,
         lambda_u: float,
+        epochs: int,
     ):
         probs_u = torch.softmax(outputs_u, dim=1)
 
@@ -159,7 +160,11 @@ class SemiLoss(object):
         )
         l_u = torch.mean((probs_u - targets_u) ** 2)
 
-        return l_x, l_u, lambda_u * linear_rampup(epoch)
+        return (
+            l_x,
+            l_u,
+            lambda_u * linear_rampup(epoch, epochs),
+        )
 
 
 class WeightEMA(object):
@@ -222,6 +227,7 @@ def train(
     train_iteration: int,
     lambda_u: float,
     alpha: float,
+    epochs: int,
 ) -> tuple[float, float, float]:
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -315,6 +321,7 @@ def train(
             targets_u=mixed_target[batch_size:],
             epoch=epoch + batch_idx / train_iteration,
             lambda_u=lambda_u,
+            epochs=epochs,
         )
 
         loss = l_x + w * l_u
