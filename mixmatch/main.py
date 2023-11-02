@@ -11,7 +11,8 @@ from torch.utils.data import DataLoader
 
 import mixmatch.dataset.cifar10 as dataset
 import mixmatch.models.wideresnet as models
-from train import SemiLoss, WeightEMA, validate, train
+from train import SemiLoss, WeightEMA
+from utils.eval import validate, train
 from utils import mkdir_p
 
 # Use CUDA
