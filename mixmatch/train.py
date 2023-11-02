@@ -47,15 +47,15 @@ def validate(
     )
 
 
-def linear_rampup(current: float, rampup_length: int):
-    if rampup_length == 0:
-        return 1.0
-    else:
-        current = np.clip(current / rampup_length, 0.0, 1.0)
-        return float(current)
-
-
 class SemiLoss(object):
+    @staticmethod
+    def linear_rampup(current: float, rampup_length: int):
+        if rampup_length == 0:
+            return 1.0
+        else:
+            current = np.clip(current / rampup_length, 0.0, 1.0)
+            return float(current)
+
     def __call__(
         self,
         outputs_x: torch.Tensor,
@@ -76,7 +76,7 @@ class SemiLoss(object):
         return (
             l_x,
             l_u,
-            lambda_u * linear_rampup(epoch, epochs),
+            lambda_u * self.linear_rampup(epoch, epochs),
         )
 
 
