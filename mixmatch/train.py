@@ -21,11 +21,10 @@ def validate(
     criterion: Callable,
     device: str,
 ):
-    losses = AverageMeter()
-    top1 = AverageMeter()
-    top5 = AverageMeter()
+    losses = []
+    top1 = []
+    top5 = []
 
-    # switch to evaluate mode
     model.eval()
     with torch.no_grad():
         for batch_idx, (inputs, targets) in tqdm(enumerate(valloader)):
@@ -37,11 +36,11 @@ def validate(
 
             # measure accuracy and record loss
             prec1, prec5 = accuracy(outputs, targets, topk=(1, 5))
-            losses.update(loss.item(), inputs.size(0))
-            top1.update(prec1.item(), inputs.size(0))
-            top5.update(prec5.item(), inputs.size(0))
+            losses.append(loss.item())
+            top1.append(prec1.item())
+            top5.append(prec5.item())
 
-    return losses.avg, top1.avg
+    return np.mean(losses), np.mean(top1)
 
 
 def save_checkpoint(
