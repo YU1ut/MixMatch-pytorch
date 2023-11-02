@@ -131,6 +131,7 @@ def main(
             mode="Test Stats ",
         )
 
+
         # save model
         is_best = val_acc > best_acc
         best_acc = max(val_acc, best_acc)
@@ -147,6 +148,15 @@ def main(
             checkpoint=out,
         )
         test_accs.append(test_acc)
+
+        print(f"Train Loss: {train_loss:.3f} | Train Acc: {train_acc:.3f} | "
+              f"Val Loss: {val_loss:.3f} | Val Acc: {val_acc:.3f} | "
+              f"Test Loss: {test_loss:.3f} | Test Acc: {test_acc:.3f} | "
+              f"Best Acc: {best_acc:.3f} | "
+              f"Mean Acc: {np.mean(test_accs[-20:]):.3f} | "
+              f"LR: {lr:.5f} | "
+              f"Train Loss X: {train_loss_x:.3f} | "
+              f"Train Loss U: {train_loss_u:.3f} ")
 
     print("Best acc:")
     print(best_acc)

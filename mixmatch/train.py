@@ -44,19 +44,6 @@ def validate(
             top1.update(prec1.item(), inputs.size(0))
             top5.update(prec5.item(), inputs.size(0))
 
-            # plot progress
-            print(
-                (
-                    "({batch}/{size}) Loss: {loss:.4f} | "
-                    "top1: {top1: .4f} | top5: {top5: .4f}"
-                ).format(
-                    batch=batch_idx + 1,
-                    size=len(valloader),
-                    loss=losses.avg,
-                    top1=top1.avg,
-                    top5=top5.avg,
-                )
-            )
     return losses.avg, top1.avg
 
 
@@ -272,21 +259,6 @@ def train(
         loss.backward()
         optimizer.step()
         ema_optimizer.step()
-
-        # plot progress
-        # bar.suffix = (
-        #     "({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s |"
-        #     " Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | "
-        #     "Loss_x: {loss_x:.4f} | Loss_u: {loss_u:.4f} | "
-        #     "W: {w:.4f}"
-        # ).format(
-        #     batch=batch_idx + 1,
-        #     size=train_iteration,
-        #     loss=losses.avg,
-        #     loss_x=losses_x.avg,
-        #     loss_u=losses_u.avg,
-        #     w=ws.avg,
-        # )
 
     return (
         losses.avg,
