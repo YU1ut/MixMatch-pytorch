@@ -102,7 +102,9 @@ def train(
         )
 
         if use_cuda:
-            inputs_x, targets_x = inputs_x.cuda(), targets_x.cuda(non_blocking=True)
+            inputs_x, targets_x = inputs_x.cuda(), targets_x.cuda(
+                non_blocking=True
+            )
             inputs_u = inputs_u.cuda()
             inputs_u2 = inputs_u2.cuda()
 
@@ -110,7 +112,10 @@ def train(
             # compute guessed labels of unlabel samples
             outputs_u = model(inputs_u)
             outputs_u2 = model(inputs_u2)
-            p = (torch.softmax(outputs_u, dim=1) + torch.softmax(outputs_u2, dim=1)) / 2
+            p = (
+                torch.softmax(outputs_u, dim=1)
+                + torch.softmax(outputs_u2, dim=1)
+            ) / 2
             pt = p ** (1 / T)
             targets_u = pt / pt.sum(dim=1, keepdim=True)
             targets_u = targets_u.detach()
@@ -224,7 +229,9 @@ def validate(
             data_time.update(time.time() - end)
 
             if use_cuda:
-                inputs, targets = inputs.cuda(), targets.cuda(non_blocking=True)
+                inputs, targets = inputs.cuda(), targets.cuda(
+                    non_blocking=True
+                )
             # compute output
             outputs = model(inputs)
             loss = criterion(outputs, targets.long())
@@ -270,7 +277,9 @@ def save_checkpoint(
     filepath = os.path.join(checkpoint, filename)
     torch.save(state, filepath)
     if is_best:
-        shutil.copyfile(filepath, os.path.join(checkpoint, "model_best.pth.tar"))
+        shutil.copyfile(
+            filepath, os.path.join(checkpoint, "model_best.pth.tar")
+        )
 
 
 def linear_rampup(current: int, rampup_length: int = EPOCHS):
@@ -292,7 +301,9 @@ class SemiLoss(object):
     ):
         probs_u = torch.softmax(outputs_u, dim=1)
 
-        l_x = -torch.mean(torch.sum(F.log_softmax(outputs_x, dim=1) * targets_x, dim=1))
+        l_x = -torch.mean(
+            torch.sum(F.log_softmax(outputs_x, dim=1) * targets_x, dim=1)
+        )
         l_u = torch.mean((probs_u - targets_u) ** 2)
 
         return l_x, l_u, LAMBDA_U * linear_rampup(epoch)
@@ -343,7 +354,3 @@ def interleave(xy, batch):
     for i in range(1, nu + 1):
         xy[0][i], xy[i][i] = xy[i][i], xy[0][i]
     return [torch.cat(v, dim=0) for v in xy]
-
-
-if __name__ == "__main__":
-    main()
